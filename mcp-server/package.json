@@ -1,0 +1,25 @@
+{
+  "name": "storyweave-mcp-server",
+  "version": "1.0.0",
+  "description": "StoryWeave MCP Server - 小说大纲管理工具的 MCP 服务",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "mcp": "node dist/index.js",
+    "api": "node dist/api-server.js",
+    "dev:mcp": "tsc --watch",
+    "dev:api": "node --watch dist/api-server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^24.0.0",
+    "typescript": "~5.9.3"
+  }
+}
