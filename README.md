@@ -142,7 +142,9 @@ story-weave/
 npm install
 
 # 安装 MCP 服务端依赖
-cd mcp-server && npm install && cd ..
+cd mcp-server
+npm install
+cd ..
 
 # 安装 AI Agent 依赖
 pip install -r agent/requirements.txt
@@ -154,7 +156,8 @@ pip install -r agent/requirements.txt
 
 ```bash
 # 终端 1：启动 MCP HTTP API 服务器（数据层）
-cd mcp-server && npm run api
+cd mcp-server
+npm run api
 
 # 终端 2：启动 AI Agent FastAPI 服务
 python -m agent.server
@@ -162,6 +165,8 @@ python -m agent.server
 # 终端 3：启动前端开发服务器
 npm run dev
 ```
+
+> **Windows PowerShell 注意**：PowerShell 5.x 不支持 `&&` 语法，请将 `cd xxx && command` 拆分为两行分别执行，或升级到 PowerShell 7+。上例已采用分行写法，可直接使用。
 
 前端开发服务器会自动将请求代理到对应后端：
 - `/api/agent/*` → `http://localhost:8000`（AI Agent 服务）
@@ -174,7 +179,8 @@ npm run dev
 npm run build
 
 # 构建 MCP 服务端
-cd mcp-server && npm run build
+cd mcp-server
+npm run build
 ```
 
 ## MCP 服务详解
