@@ -2,6 +2,7 @@
   <BookshelfView
     v-if="currentView === 'bookshelf'"
     @open-book="openBook"
+    @toggle-ai="toggleAiPanel"
   />
 
   <div v-else-if="currentView === 'editor'" class="editor-page">
@@ -119,6 +120,13 @@
       <span>加载中...</span>
     </div>
   </div>
+
+  <AiPanel
+    v-if="currentView === 'bookshelf'"
+    ref="aiPanelRefBookshelf"
+    :visible="showAiPanel"
+    @close="showAiPanel = false"
+  />
 </template>
 
 <script setup lang="ts">
@@ -187,9 +195,19 @@ const isLoading = ref(false);
 const showDeleteConfirm = ref(false);
 const showAiPanel = ref(false);
 const aiPanelRef = ref<InstanceType<typeof AiPanel> | null>(null);
+const aiPanelRefBookshelf = ref<InstanceType<typeof AiPanel> | null>(null);
 
 const toggleAiPanel = () => {
   showAiPanel.value = !showAiPanel.value;
+  if (showAiPanel.value) {
+    nextTick(() => {
+      if (currentView.value === 'bookshelf') {
+        aiPanelRefBookshelf.value?.switchBook(null);
+      } else {
+        aiPanelRef.value?.switchBook(currentBook.value?.id || null);
+      }
+    });
+  }
 };
 
 const getNodeTitle = (id: string): string => {
@@ -450,6 +468,7 @@ const backToBookshelf = () => {
   edges.value = [];
   selectedNode.value = null;
   selectedEdge.value = null;
+  showAiPanel.value = false;
 };
 
 watch(

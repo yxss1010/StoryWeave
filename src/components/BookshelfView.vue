@@ -6,6 +6,10 @@
         <Plus :size="18" />
         <span>新建小说</span>
       </button>
+      <button class="btn-ai" @click="emit('toggle-ai')">
+        <Sparkles :size="18" />
+        <span>AI 创作</span>
+      </button>
     </header>
 
     <main class="novel-grid" v-if="novels.length">
@@ -44,7 +48,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { Plus, BookOpen } from 'lucide-vue-next';
+import { Plus, BookOpen, Sparkles } from 'lucide-vue-next';
 import { useNovels } from '../composables/useNovels';
 import NovelCard from './NovelCard.vue';
 import CreateNovelModal from './CreateNovelModal.vue';
@@ -53,6 +57,7 @@ import type { BookMetadata } from '../services/tauri';
 
 const emit = defineEmits<{
   (e: 'open-book', book: BookMetadata): void;
+  (e: 'toggle-ai'): void;
 }>();
 
 const { novels, loadNovels, addNovel, removeNovel } = useNovels();
@@ -150,6 +155,25 @@ onMounted(() => {
   background-color: var(--primary-hover);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
+}
+
+.btn-ai {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: var(--transition);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+.btn-ai:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
 }
 
 .novel-grid {
