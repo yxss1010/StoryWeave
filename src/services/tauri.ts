@@ -5,6 +5,8 @@ export interface BookMetadata {
   title: string;
   cover: string;
   file_path: string;
+  synopsis: string;
+  settings: string;
   last_modified: string;
   created_at: string;
 }
@@ -62,6 +64,10 @@ export async function updateBookMetadata(bookId: string, updates: Partial<BookMe
     method: 'PUT',
     body: JSON.stringify(updates),
   });
+}
+
+export async function getBookDetail(bookId: string): Promise<BookMetadata> {
+  return apiFetch<BookMetadata>(`/books/${bookId}`);
 }
 
 function extractBookId(filePath: string): string {

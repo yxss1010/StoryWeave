@@ -38,16 +38,20 @@ export function registerTools(server: McpServer): void {
 
   server.tool(
     'update_book',
-    '更新小说元信息（标题、封面等）',
+    '更新小说元信息（标题、封面、简介、设定等）',
     {
       bookId: z.string().describe('书籍 ID'),
       title: z.string().optional().describe('新标题'),
       cover: z.string().optional().describe('新封面'),
+      synopsis: z.string().optional().describe('小说简介'),
+      settings: z.string().optional().describe('小说设定（世界观、角色设定、魔法体系等）'),
     },
-    async ({ bookId, title, cover }) => {
+    async ({ bookId, title, cover, synopsis, settings }) => {
       const updates: Record<string, string> = {};
       if (title !== undefined) updates.title = title;
       if (cover !== undefined) updates.cover = cover;
+      if (synopsis !== undefined) updates.synopsis = synopsis;
+      if (settings !== undefined) updates.settings = settings;
       const book = storage.updateBook(bookId, updates);
       if (!book) {
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: '书籍不存在' }) }] };

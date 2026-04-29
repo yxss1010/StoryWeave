@@ -13,6 +13,9 @@
       </button>
       <h1 class="editor-title">{{ currentBook?.title || '未命名书籍' }}</h1>
       <div class="header-actions">
+        <button class="btn-icon" :class="{ 'btn-icon-active': showBookInfo }" @click="showBookInfo = !showBookInfo" title="书籍信息">
+          <BookOpen :size="18" />
+        </button>
         <button class="btn-icon" :class="{ 'btn-icon-active': showAiPanel }" @click="toggleAiPanel" title="AI 创作助手">
           <Sparkles :size="18" />
         </button>
@@ -99,6 +102,15 @@
       @close="showAiPanel = false"
     />
 
+    <BookInfoPanel
+      v-if="showBookInfo && currentBook"
+      :title="currentBook.title"
+      :synopsis="currentBook.synopsis || ''"
+      :settings="currentBook.settings || ''"
+      @close="showBookInfo = false"
+      @save="handleSaveBookInfo"
+    />
+
     <EditorPanel
       v-if="selectedNode"
       :node-data="selectedNode.data as PlotNodeData"
@@ -154,8 +166,9 @@ import PlotNode from './components/PlotNode.vue';
 import EditorPanel from './components/EditorPanel.vue';
 import BookshelfView from './components/BookshelfView.vue';
 import ConfirmModal from './components/ConfirmModal.vue';
+import BookInfoPanel from './components/BookInfoPanel.vue';
 import AiPanel from './components/AiPanel.vue';
-import { loadBookData, saveBookData } from './services/tauri';
+import { loadBookData, saveBookData, updateBookMetadata, getBookDetail } from './services/tauri';
 import type { BookMetadata } from './services/tauri';
 import { useAiChat } from './composables/useAiChat';
 import dagre from 'dagre';
@@ -206,6 +219,7 @@ const showSaveSuccess = ref(false);
 const isLoading = ref(false);
 const showDeleteConfirm = ref(false);
 const showAiPanel = ref(false);
+const showBookInfo = ref(false);
 
 const { isStreaming: isAiStreaming } = useAiChat();
 const aiPanelRef = ref<InstanceType<typeof AiPanel> | null>(null);
@@ -481,6 +495,19 @@ const saveBook = async () => {
   }
 };
 
+const handleSaveBookInfo = async (data: { title: string; synopsis: string; settings: string }) => {
+  if (!currentBook.value) return;
+  try {
+    await updateBookMetadata(currentBook.value.id, data);
+    currentBook.value = { ...currentBook.value, ...data };
+    showBookInfo.value = false;
+    showToastMessage('书籍信息已保存');
+  } catch (error) {
+    console.error('Error saving book info:', error);
+    showToastMessage('保存失败');
+  }
+};
+
 const backToBookshelf = () => {
   currentView.value = 'bookshelf';
   currentBook.value = null;
@@ -489,6 +516,7 @@ const backToBookshelf = () => {
   selectedNode.value = null;
   selectedEdge.value = null;
   showAiPanel.value = false;
+  showBookInfo.value = false;
 };
 
 watch(isAiStreaming, async (streaming, wasStreaming) => {
@@ -499,6 +527,8 @@ watch(isAiStreaming, async (streaming, wasStreaming) => {
       nodes.value = loadedNodes;
       edges.value = loadedEdges;
       selectedNode.value = null;
+      const updatedBook = await getBookDetail(currentBook.value.id);
+      currentBook.value = updatedBook;
       await new Promise(resolve => setTimeout(resolve, 100));
       autoLayout();
     } catch (error) {

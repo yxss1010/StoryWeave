@@ -7,6 +7,8 @@ export interface BookMetadata {
   title: string;
   cover: string;
   file_path: string;
+  synopsis: string;
+  settings: string;
   last_modified: string;
   created_at: string;
 }
@@ -90,6 +92,8 @@ export function createBook(title: string, cover: string = ''): BookMetadata {
     title,
     cover,
     file_path: `outline_${id}`,
+    synopsis: '',
+    settings: '',
     last_modified: now,
     created_at: now,
   };
