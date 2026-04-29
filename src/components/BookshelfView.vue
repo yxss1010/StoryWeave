@@ -2,15 +2,18 @@
   <div class="novel-list-page">
     <header class="page-header">
       <h1 class="page-title">我的小说</h1>
-      <button class="btn-create" @click="showCreateModal = true">
-        <Plus :size="18" />
-        <span>新建小说</span>
-      </button>
       <button class="btn-ai" @click="emit('toggle-ai')">
         <Sparkles :size="18" />
         <span>AI 创作</span>
       </button>
     </header>
+
+    <div class="actions-bar">
+      <button class="btn-create" @click="showCreateModal = true">
+        <Plus :size="18" />
+        <span>新建小说</span>
+      </button>
+    </div>
 
     <main class="novel-grid" v-if="novels.length">
       <NovelCard
@@ -127,7 +130,11 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 32px;
+  margin-bottom: 16px;
+}
+
+.actions-bar {
+  margin-bottom: 20px;
 }
 
 .page-title {
