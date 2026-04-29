@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from langchain_anthropic import ChatAnthropic
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.prebuilt import create_react_agent
 from starlette.responses import StreamingResponse
@@ -62,6 +62,7 @@ app.add_middleware(
 
 class ChatRequest(BaseModel):
     messages: list[dict]
+    bookId: str | None = None
 
 
 class ChatMessage(BaseModel):
@@ -69,8 +70,16 @@ class ChatMessage(BaseModel):
     content: str
 
 
-def _build_lc_messages(messages: list[dict]) -> list[BaseMessage]:
+def _build_lc_messages(messages: list[dict], book_id: str | None = None) -> list[BaseMessage]:
     lc_messages: list[BaseMessage] = []
+    if book_id:
+        context = (
+            f"[系统上下文] 用户当前正在编辑一本已有的小说，bookId 为「{book_id}」。"
+            f"你应该直接对这本书进行操作（查看大纲、添加/修改/删除节点等），"
+            f"而不是调用 create_book 创建新书。"
+            f"如需了解当前大纲状态，请先调用 get_outline 或 list_nodes。"
+        )
+        lc_messages.append(SystemMessage(content=context))
     for msg in messages:
         if msg.get("role") == "user":
             lc_messages.append(HumanMessage(content=msg.get("content", "")))
@@ -101,7 +110,7 @@ def _extract_text(content) -> str:
 @app.post("/api/agent/chat")
 async def chat(request: ChatRequest):
     agent = await get_or_create_agent()
-    lc_messages = _build_lc_messages(request.messages)
+    lc_messages = _build_lc_messages(request.messages, request.bookId)
     result = await agent.ainvoke({"messages": lc_messages})
     final = result["messages"][-1]
     return {"role": "assistant", "content": _extract_text(final.content)}
@@ -110,7 +119,7 @@ async def chat(request: ChatRequest):
 @app.post("/api/agent/chat/stream")
 async def chat_stream(request: ChatRequest):
     agent = await get_or_create_agent()
-    lc_messages = _build_lc_messages(request.messages)
+    lc_messages = _build_lc_messages(request.messages, request.bookId)
 
     async def event_generator():
         try:

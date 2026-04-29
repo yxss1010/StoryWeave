@@ -98,6 +98,7 @@ async function sendMessage(text: string) {
   try {
     await streamChat(
       chatMessages,
+      bookId,
       (chunk: string) => {
         streamingText.value += chunk;
       },

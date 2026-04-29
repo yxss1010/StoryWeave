@@ -13,6 +13,7 @@ export interface ToolEvent {
 
 export async function streamChat(
   messages: ChatMessage[],
+  bookId: string | null,
   onText: (text: string) => void,
   onToolEvent: (event: ToolEvent) => void,
   onDone: () => void,
@@ -21,7 +22,7 @@ export async function streamChat(
   const res = await fetch(`${API_BASE}/chat/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ messages, bookId }),
   });
 
   if (!res.ok) {
