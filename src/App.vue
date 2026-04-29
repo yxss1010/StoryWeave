@@ -87,6 +87,7 @@
     <AiPanel
       ref="aiPanelRef"
       :visible="showAiPanel"
+      :book-title="currentBook?.title || null"
       @close="showAiPanel = false"
     />
 
@@ -125,6 +126,7 @@
     v-if="currentView === 'bookshelf'"
     ref="aiPanelRefBookshelf"
     :visible="showAiPanel"
+    :book-title="null"
     @close="showAiPanel = false"
   />
 </template>

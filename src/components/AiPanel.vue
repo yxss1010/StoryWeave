@@ -5,7 +5,12 @@
       <div class="ai-header">
         <div class="ai-header-left">
           <Sparkles :size="18" class="ai-icon" />
-          <h2 class="ai-title">AI 创作助手</h2>
+          <div class="ai-header-text">
+            <h2 class="ai-title">AI 创作助手</h2>
+            <span class="ai-scope-tag" :class="bookTitle ? 'editing' : 'creating'">
+              {{ bookTitle ? `📖 ${bookTitle}` : '✨ 新建小说' }}
+            </span>
+          </div>
         </div>
         <div class="ai-header-right">
           <button v-if="messages.length > 0" class="ai-action-btn" @click="handleClear" title="清空对话">
@@ -112,7 +117,10 @@ import { Sparkles, X, Send, Trash2 } from 'lucide-vue-next';
 import { Marked } from 'marked';
 import { useAiChat } from '../composables/useAiChat';
 
-defineProps<{ visible: boolean }>();
+defineProps<{
+  visible: boolean;
+  bookTitle?: string | null;
+}>();
 const emit = defineEmits<{ (e: 'close'): void }>();
 
 const {
@@ -276,6 +284,34 @@ defineExpose({ switchBook });
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.ai-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ai-scope-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 8px;
+  border-radius: 10px;
+  width: fit-content;
+  line-height: 1.6;
+}
+
+.ai-scope-tag.editing {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+}
+
+.ai-scope-tag.creating {
+  background: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
 }
 
 .ai-header-right {
