@@ -6,9 +6,14 @@
           <Sparkles :size="18" class="ai-icon" />
           <h2 class="ai-title">AI 创作助手</h2>
         </div>
-        <button class="ai-close" @click="$emit('close')" title="关闭">
-          <X :size="18" />
-        </button>
+        <div class="ai-header-right">
+          <button v-if="messages.length > 0" class="ai-action-btn" @click="handleClear" title="清空对话">
+            <Trash2 :size="14" />
+          </button>
+          <button class="ai-close" @click="$emit('close')" title="关闭">
+            <X :size="18" />
+          </button>
+        </div>
       </div>
 
       <div class="ai-messages" ref="messagesContainer">
@@ -49,7 +54,8 @@
                 <span class="tool-name">{{ evt.name }}</span>
               </div>
             </div>
-            <div class="message-text" v-html="renderMarkdown(msg.content)"></div>
+            <div v-if="msg.role === 'user'" class="message-text">{{ msg.content }}</div>
+            <div v-else class="message-text markdown-body" v-html="renderMarkdown(msg.content)"></div>
           </div>
         </div>
 
@@ -67,9 +73,8 @@
                 <span class="tool-name">{{ evt.name }}</span>
               </div>
             </div>
-            <div class="message-text streaming-text">
-              {{ streamingText }}<span class="cursor">▌</span>
-            </div>
+            <div class="message-text markdown-body streaming-text" v-html="renderMarkdown(streamingText)"></div>
+            <span class="cursor">▌</span>
           </div>
         </div>
       </div>
@@ -101,26 +106,38 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, watch } from 'vue';
-import { Sparkles, X, Send } from 'lucide-vue-next';
-import { streamChat, type ChatMessage, type ToolEvent } from '../services/agent';
+import { ref, nextTick, watch, onMounted } from 'vue';
+import { Sparkles, X, Send, Trash2 } from 'lucide-vue-next';
+import { Marked } from 'marked';
+import { useAiChat } from '../composables/useAiChat';
 
 defineProps<{ visible: boolean }>();
 const emit = defineEmits<{ (e: 'close'): void }>();
 
-interface DisplayMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  toolEvents: ToolEvent[];
-}
+const {
+  messages,
+  isStreaming,
+  streamingText,
+  activeToolEvents,
+  currentBookId,
+  switchBook,
+  sendMessage,
+  clearMessages,
+} = useAiChat();
 
-const messages = ref<DisplayMessage[]>([]);
 const inputText = ref('');
-const isStreaming = ref(false);
-const streamingText = ref('');
-const activeToolEvents = ref<ToolEvent[]>([]);
 const messagesContainer = ref<HTMLElement | null>(null);
 const inputRef = ref<HTMLTextAreaElement | null>(null);
+
+const marked = new Marked({
+  gfm: true,
+  breaks: true,
+});
+
+function renderMarkdown(text: string): string {
+  if (!text) return '';
+  return marked.parse(text) as string;
+}
 
 const quickPrompts = [
   { icon: '🎭', label: '三幕式故事', text: '我想写一个关于失忆侦探寻找真相的悬疑小说，采用三幕式结构' },
@@ -146,17 +163,6 @@ function autoResize() {
   }
 }
 
-function renderMarkdown(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\n/g, '<br>');
-}
-
 function sendQuickPrompt(text: string) {
   inputText.value = text;
   handleSend();
@@ -166,62 +172,26 @@ async function handleSend() {
   const text = inputText.value.trim();
   if (!text || isStreaming.value) return;
 
-  messages.value.push({ role: 'user', content: text, toolEvents: [] });
   inputText.value = '';
   if (inputRef.value) {
     inputRef.value.style.height = 'auto';
   }
 
-  isStreaming.value = true;
-  streamingText.value = '';
-  activeToolEvents.value = [];
-
-  const chatMessages: ChatMessage[] = messages.value.map(m => ({
-    role: m.role,
-    content: m.content,
-  }));
-
-  try {
-    await streamChat(
-      chatMessages,
-      (chunk: string) => {
-        streamingText.value += chunk;
-      },
-      (event: ToolEvent) => {
-        activeToolEvents.value = [...activeToolEvents.value, event];
-      },
-      () => {
-        messages.value.push({
-          role: 'assistant',
-          content: streamingText.value,
-          toolEvents: [...activeToolEvents.value],
-        });
-        streamingText.value = '';
-        activeToolEvents.value = [];
-        isStreaming.value = false;
-      },
-      (error: string) => {
-        messages.value.push({
-          role: 'assistant',
-          content: `❌ 出错了: ${error}`,
-          toolEvents: [],
-        });
-        streamingText.value = '';
-        activeToolEvents.value = [];
-        isStreaming.value = false;
-      },
-    );
-  } catch (e: any) {
-    messages.value.push({
-      role: 'assistant',
-      content: `❌ 请求失败: ${e.message}`,
-      toolEvents: [],
-    });
-    isStreaming.value = false;
-    streamingText.value = '';
-    activeToolEvents.value = [];
-  }
+  await sendMessage(text);
 }
+
+async function handleClear() {
+  await clearMessages(currentBookId.value || undefined);
+}
+
+onMounted(() => {
+  const match = window.location.pathname.match(/\/book\/([^/]+)/);
+  if (match) {
+    switchBook(match[1]);
+  }
+});
+
+defineExpose({ switchBook });
 </script>
 
 <style scoped>
@@ -264,6 +234,12 @@ async function handleSend() {
   gap: 10px;
 }
 
+.ai-header-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .ai-icon {
   color: var(--primary);
 }
@@ -273,6 +249,23 @@ async function handleSend() {
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
+}
+
+.ai-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  transition: var(--transition);
+}
+
+.ai-action-btn:hover {
+  background: #fef2f2;
+  color: #ef4444;
 }
 
 .ai-close {
@@ -449,11 +442,103 @@ async function handleSend() {
   border-bottom-left-radius: 4px;
 }
 
-.ai-message.assistant .message-text :deep(code) {
+.markdown-body :deep(h1),
+.markdown-body :deep(h2),
+.markdown-body :deep(h3),
+.markdown-body :deep(h4) {
+  margin: 0.6em 0 0.4em;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.markdown-body :deep(h1) { font-size: 1.25em; }
+.markdown-body :deep(h2) { font-size: 1.15em; }
+.markdown-body :deep(h3) { font-size: 1.05em; }
+.markdown-body :deep(h4) { font-size: 1em; }
+
+.markdown-body :deep(p) {
+  margin: 0.4em 0;
+}
+
+.markdown-body :deep(ul),
+.markdown-body :deep(ol) {
+  margin: 0.4em 0;
+  padding-left: 1.5em;
+}
+
+.markdown-body :deep(li) {
+  margin: 0.2em 0;
+}
+
+.markdown-body :deep(code) {
   background: rgba(0, 0, 0, 0.06);
   padding: 1px 5px;
   border-radius: 4px;
   font-size: 13px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+.markdown-body :deep(pre) {
+  background: #1e1e2e;
+  color: #cdd6f4;
+  padding: 12px 14px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 0.6em 0;
+}
+
+.markdown-body :deep(pre code) {
+  background: none;
+  padding: 0;
+  font-size: 13px;
+  color: inherit;
+}
+
+.markdown-body :deep(blockquote) {
+  border-left: 3px solid var(--primary);
+  margin: 0.6em 0;
+  padding: 0.3em 0.8em;
+  color: var(--text-secondary);
+  background: rgba(79, 70, 229, 0.04);
+  border-radius: 0 6px 6px 0;
+}
+
+.markdown-body :deep(strong) {
+  font-weight: 700;
+}
+
+.markdown-body :deep(em) {
+  font-style: italic;
+}
+
+.markdown-body :deep(a) {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.markdown-body :deep(hr) {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 0.8em 0;
+}
+
+.markdown-body :deep(table) {
+  border-collapse: collapse;
+  margin: 0.6em 0;
+  width: 100%;
+  font-size: 13px;
+}
+
+.markdown-body :deep(th),
+.markdown-body :deep(td) {
+  border: 1px solid #e5e7eb;
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.markdown-body :deep(th) {
+  background: #f3f4f6;
+  font-weight: 600;
 }
 
 .streaming-text {
@@ -465,6 +550,7 @@ async function handleSend() {
 .cursor {
   animation: blink 1s step-end infinite;
   color: var(--primary);
+  font-size: 14px;
 }
 
 @keyframes blink {

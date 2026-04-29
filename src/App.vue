@@ -84,6 +84,7 @@
     </div>
 
     <AiPanel
+      ref="aiPanelRef"
       :visible="showAiPanel"
       @close="showAiPanel = false"
     />
@@ -121,7 +122,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, provide, onMounted, onUnmounted } from 'vue';
+import { ref, watch, provide, onMounted, onUnmounted, nextTick } from 'vue';
 import { VueFlow, useVueFlow } from '@vue-flow/core';
 import { Background } from '@vue-flow/background';
 import { Controls } from '@vue-flow/controls';
@@ -185,6 +186,7 @@ const showSaveSuccess = ref(false);
 const isLoading = ref(false);
 const showDeleteConfirm = ref(false);
 const showAiPanel = ref(false);
+const aiPanelRef = ref<InstanceType<typeof AiPanel> | null>(null);
 
 const toggleAiPanel = () => {
   showAiPanel.value = !showAiPanel.value;
@@ -407,6 +409,10 @@ const openBook = async (book: BookMetadata) => {
     edges.value = loadedEdges;
     currentBook.value = book;
     currentView.value = 'editor';
+
+    nextTick(() => {
+      aiPanelRef.value?.switchBook(book.id);
+    });
 
     await new Promise(resolve => setTimeout(resolve, 100));
     autoLayout();

@@ -32,6 +32,8 @@
 - **MCP 协议集成**：Agent 自动调用 MCP Tools 完成大纲创建
 - **快速灵感模板**：三幕式/英雄之旅/自由灵感一键启动
 - **多轮对话**：支持设定调整、大纲修改等交互式创作
+- **对话持久化**：基于 IndexedDB (Dexie) 按书籍存储对话历史，刷新/重启后自动恢复
+- **Markdown 渲染**：AI 回复完整支持 Markdown 格式（标题、列表、代码块、表格、引用等）
 - **一键切换**：点击 ✨ 按钮即可打开/关闭 AI 面板，手动编辑与 AI 创作自由切换
 
 ### MCP 服务（供 AI Agent 使用）
@@ -57,6 +59,8 @@
 - **Vue 3** — Composition API + `<script setup>` + TypeScript
 - **Vue Flow** — 流程图可视化与交互
 - **Dagre** — 自动布局算法
+- **Dexie** — IndexedDB 封装，对话历史持久化
+- **Marked** — Markdown 解析渲染
 - **Lucide Vue Next** — 图标库
 - **Tailwind CSS 4** — 原子化样式
 - **Vite** — 构建工具
@@ -96,7 +100,8 @@ story-weave/
 │   │   ├── EditorPanel.vue        # 节点编辑侧边面板
 │   │   └── AiPanel.vue            # AI 创作助手聊天面板
 │   ├── composables/
-│   │   └── useNovels.ts           # 书籍数据管理 composable
+│   │   ├── useNovels.ts           # 书籍数据管理 composable
+│   │   └── useAiChat.ts           # AI 对话状态管理 + Dexie 持久化
 │   └── services/
 │       ├── tauri.ts               # 数据持久化服务（HTTP API 实现）
 │       └── agent.ts               # AI Agent SSE 流式通信服务
