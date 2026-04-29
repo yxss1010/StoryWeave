@@ -126,7 +126,6 @@ export function getOutline(bookId: string): OutlineData {
 
 export function saveOutline(bookId: string, data: OutlineData): void {
   writeJsonFile(getOutlineFilePath(bookId), data);
-  updateBook(bookId, {});
 }
 
 export function addNode(
@@ -172,6 +171,7 @@ export function addNode(
   }
 
   saveOutline(bookId, outline);
+  updateBook(bookId, {});
   return node;
 }
 
@@ -181,6 +181,7 @@ export function updateNode(bookId: string, nodeId: string, updates: Record<strin
   if (!node) return null;
   node.data = { ...node.data, ...updates };
   saveOutline(bookId, outline);
+  updateBook(bookId, {});
   return node;
 }
 
@@ -191,6 +192,7 @@ export function deleteNode(bookId: string, nodeId: string): boolean {
   outline.edges = outline.edges.filter(e => e.source !== nodeId && e.target !== nodeId);
   if (outline.nodes.length === before) return false;
   saveOutline(bookId, outline);
+  updateBook(bookId, {});
   return true;
 }
 
@@ -211,6 +213,7 @@ export function connectNodes(bookId: string, sourceId: string, targetId: string)
   };
   outline.edges.push(edge);
   saveOutline(bookId, outline);
+  updateBook(bookId, {});
   return edge;
 }
 
@@ -220,6 +223,7 @@ export function disconnectNodes(bookId: string, sourceId: string, targetId: stri
   outline.edges = outline.edges.filter(e => !(e.source === sourceId && e.target === targetId));
   if (outline.edges.length === before) return false;
   saveOutline(bookId, outline);
+  updateBook(bookId, {});
   return true;
 }
 

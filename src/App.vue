@@ -192,6 +192,7 @@ const selectedNode = ref<Node | null>(null);
 const selectedEdge = ref<Edge | null>(null);
 const showToast = ref(false);
 const toastMessage = ref('');
+let skipAutoSave = true;
 const showSaveSuccess = ref(false);
 const isLoading = ref(false);
 const showDeleteConfirm = ref(false);
@@ -422,6 +423,7 @@ const normalizeEdges = (edges: Edge[]) => {
 };
 
 const openBook = async (book: BookMetadata) => {
+  skipAutoSave = true;
   isLoading.value = true;
   try {
     const { nodes: loadedNodes, edges: loadedEdges } = await loadBookData(book.file_path);
@@ -436,9 +438,14 @@ const openBook = async (book: BookMetadata) => {
 
     await new Promise(resolve => setTimeout(resolve, 100));
     autoLayout();
+
+    nextTick(() => {
+      skipAutoSave = false;
+    });
   } catch (error) {
     console.error('Error opening book:', error);
     showToastMessage('打开书籍失败');
+    skipAutoSave = false;
   } finally {
     isLoading.value = false;
   }
@@ -476,14 +483,14 @@ const backToBookshelf = () => {
 watch(
   [() => nodes.value, () => edges.value],
   async (newValues) => {
-    if (!isLoading.value && currentView.value === 'editor' && currentBook.value) {
-      await debouncedSaveBook(newValues[0], newValues[1]);
-    }
+    if (skipAutoSave || isLoading.value || !currentBook.value) return;
+    await debouncedSaveBook(newValues[0], newValues[1]);
   },
   { deep: true }
 );
 
 const autoLayout = () => {
+  skipAutoSave = true;
   const g = new dagre.graphlib.Graph();
   g.setGraph({
     rankdir: 'TB',
@@ -516,6 +523,10 @@ const autoLayout = () => {
   });
 
   nodes.value = [...newNodes];
+
+  nextTick(() => {
+    skipAutoSave = false;
+  });
 };
 
 const debounce = (func: Function, delay: number) => {

@@ -63,6 +63,7 @@ app.put('/api/books/:bookId/outline', (req, res) => {
     return;
   }
   storage.saveOutline(req.params.bookId, { nodes, edges });
+  storage.updateBook(req.params.bookId, {});
   res.json({ success: true });
 });
 
