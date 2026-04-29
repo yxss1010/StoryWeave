@@ -76,8 +76,6 @@ export async function streamChat(
       }
     }
   }
-
-  onDone();
 }
 
 export async function checkAgentHealth(): Promise<boolean> {

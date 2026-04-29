@@ -1,6 +1,7 @@
 <template>
   <Transition name="slide">
-    <div v-if="visible" class="ai-panel">
+    <div v-if="visible" class="ai-panel" :style="{ width: panelWidth + 'px' }">
+      <div class="resize-handle" @mousedown="startResize"></div>
       <div class="ai-header">
         <div class="ai-header-left">
           <Sparkles :size="18" class="ai-icon" />
@@ -129,6 +130,33 @@ const inputText = ref('');
 const messagesContainer = ref<HTMLElement | null>(null);
 const inputRef = ref<HTMLTextAreaElement | null>(null);
 
+const MIN_WIDTH = 360;
+const MAX_WIDTH = 720;
+const panelWidth = ref(420);
+
+function startResize(e: MouseEvent) {
+  e.preventDefault();
+  const startX = e.clientX;
+  const startWidth = panelWidth.value;
+
+  function onMouseMove(ev: MouseEvent) {
+    const delta = startX - ev.clientX;
+    panelWidth.value = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + delta));
+  }
+
+  function onMouseUp() {
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }
+
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', onMouseUp);
+}
+
 const marked = new Marked({
   gfm: true,
   breaks: true,
@@ -200,13 +228,29 @@ defineExpose({ switchBook });
   right: 0;
   top: 0;
   height: 100vh;
-  width: 420px;
+  min-width: 360px;
+  max-width: 720px;
   background: var(--card-bg);
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.08);
   border-left: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
   z-index: 9998;
+}
+
+.resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 1;
+}
+
+.resize-handle:hover,
+.resize-handle:active {
+  background: rgba(79, 70, 229, 0.15);
 }
 
 .slide-enter-active,
