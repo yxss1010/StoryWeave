@@ -24,20 +24,20 @@
 
     <div class="editor-body">
       <aside class="toolbar">
-        <button class="toolbar-btn" @click="addNode('volume')">
+        <button class="toolbar-btn" :disabled="isAiStreaming" @click="addNode('volume')">
           <BookOpen :size="18" />
           <span>添加卷</span>
         </button>
-        <button class="toolbar-btn" @click="addNode('act')">
+        <button class="toolbar-btn" :disabled="isAiStreaming" @click="addNode('act')">
           <Drama :size="18" />
           <span>添加幕</span>
         </button>
-        <button class="toolbar-btn" @click="addNode('scene')">
+        <button class="toolbar-btn" :disabled="isAiStreaming" @click="addNode('scene')">
           <Clapperboard :size="18" />
           <span>添加场景</span>
         </button>
         <div class="toolbar-divider"></div>
-        <button class="toolbar-btn toolbar-btn-primary" @click="autoLayout">
+        <button class="toolbar-btn toolbar-btn-primary" :disabled="isAiStreaming" @click="autoLayout">
           <Sparkles :size="18" />
           <span>自动排列</span>
         </button>
@@ -77,9 +77,17 @@
           </template>
         </VueFlow>
 
-        <div v-if="nodes.length === 0" class="canvas-empty">
+        <div v-if="nodes.length === 0 && !isAiStreaming" class="canvas-empty">
           <FileText :size="48" :stroke-width="1" />
           <p>点击左侧工具栏添加节点，或点击右上角 ✨ 使用 AI 生成大纲</p>
+        </div>
+
+        <div v-if="isAiStreaming" class="ai-working-overlay">
+          <div class="ai-working-content">
+            <div class="ai-working-spinner"></div>
+            <p class="ai-working-text">AI 正在创作中...</p>
+            <p class="ai-working-sub">大纲生成完成后将自动刷新</p>
+          </div>
         </div>
       </div>
     </div>
@@ -149,6 +157,7 @@ import ConfirmModal from './components/ConfirmModal.vue';
 import AiPanel from './components/AiPanel.vue';
 import { loadBookData, saveBookData } from './services/tauri';
 import type { BookMetadata } from './services/tauri';
+import { useAiChat } from './composables/useAiChat';
 import dagre from 'dagre';
 
 interface BasePlotNodeData {
@@ -197,6 +206,8 @@ const showSaveSuccess = ref(false);
 const isLoading = ref(false);
 const showDeleteConfirm = ref(false);
 const showAiPanel = ref(false);
+
+const { isStreaming: isAiStreaming } = useAiChat();
 const aiPanelRef = ref<InstanceType<typeof AiPanel> | null>(null);
 const aiPanelRefBookshelf = ref<InstanceType<typeof AiPanel> | null>(null);
 
@@ -480,6 +491,26 @@ const backToBookshelf = () => {
   showAiPanel.value = false;
 };
 
+watch(isAiStreaming, async (streaming, wasStreaming) => {
+  if (wasStreaming && !streaming && currentBook.value && currentView.value === 'editor') {
+    skipAutoSave = true;
+    try {
+      const { nodes: loadedNodes, edges: loadedEdges } = await loadBookData(currentBook.value.file_path);
+      nodes.value = loadedNodes;
+      edges.value = loadedEdges;
+      selectedNode.value = null;
+      await new Promise(resolve => setTimeout(resolve, 100));
+      autoLayout();
+    } catch (error) {
+      console.error('Error reloading outline after AI:', error);
+    } finally {
+      nextTick(() => {
+        skipAutoSave = false;
+      });
+    }
+  }
+});
+
 watch(
   [() => nodes.value, () => edges.value],
   async (newValues) => {
@@ -657,6 +688,12 @@ const debouncedSaveBook = debounce(async (nodes: Node[], edges: Edge[]) => {
   transform: translateX(2px);
 }
 
+.toolbar-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .toolbar-btn-primary {
   background: var(--primary);
   color: #fff;
@@ -697,6 +734,50 @@ const debouncedSaveBook = debounce(async (nodes: Node[], edges: Edge[]) => {
   color: var(--text-secondary);
   font-size: 16px;
   pointer-events: none;
+}
+
+.ai-working-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.ai-working-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.ai-working-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e5e7eb;
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: ai-spin 0.8s linear infinite;
+}
+
+@keyframes ai-spin {
+  to { transform: rotate(360deg); }
+}
+
+.ai-working-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.ai-working-sub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
 }
 
 .toast {
