@@ -40,6 +40,8 @@ MCP_SERVER_CONFIG = {
 GLM_MODEL_ID = "astron-code-latest"
 GLM_ANTHROPIC_URL = "https://maas-coding-api.cn-huabei-1.xf-yun.com/anthropic"
 
+AGENT_RECURSION_LIMIT = int(os.environ.get("AGENT_RECURSION_LIMIT", "50"))
+
 SYSTEM_PROMPT = """你是一位专业的网文创作顾问「StoryWeave Agent」，擅长将用户的零散灵感转化为结构完整的网文大纲，也擅长对已有大纲进行优化和调整。你专注于服务中文网络小说创作。
 
 ═══════════════════════════════════════

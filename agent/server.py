@@ -12,7 +12,7 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.prebuilt import create_react_agent
 from starlette.responses import StreamingResponse
 
-from .config import GLM_ANTHROPIC_URL, GLM_MODEL_ID, MCP_SERVER_CONFIG, SYSTEM_PROMPT
+from .config import AGENT_RECURSION_LIMIT, GLM_ANTHROPIC_URL, GLM_MODEL_ID, MCP_SERVER_CONFIG, SYSTEM_PROMPT
 
 
 def create_llm() -> ChatAnthropic:
@@ -111,7 +111,8 @@ def _extract_text(content) -> str:
 async def chat(request: ChatRequest):
     agent = await get_or_create_agent()
     lc_messages = _build_lc_messages(request.messages, request.bookId)
-    result = await agent.ainvoke({"messages": lc_messages})
+    config = {"recursion_limit": AGENT_RECURSION_LIMIT}
+    result = await agent.ainvoke({"messages": lc_messages}, config=config)
     final = result["messages"][-1]
     return {"role": "assistant", "content": _extract_text(final.content)}
 
@@ -123,8 +124,9 @@ async def chat_stream(request: ChatRequest):
 
     async def event_generator():
         try:
+            config = {"recursion_limit": AGENT_RECURSION_LIMIT}
             async for event in agent.astream_events(
-                {"messages": lc_messages}, version="v2"
+                {"messages": lc_messages}, config=config, version="v2"
             ):
                 kind = event.get("event")
                 if kind == "on_chat_model_stream":

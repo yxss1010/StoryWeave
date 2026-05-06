@@ -8,7 +8,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.prebuilt import create_react_agent
 
-from .config import GLM_ANTHROPIC_URL, GLM_MODEL_ID, MCP_SERVER_CONFIG, SYSTEM_PROMPT
+from .config import AGENT_RECURSION_LIMIT, GLM_ANTHROPIC_URL, GLM_MODEL_ID, MCP_SERVER_CONFIG, SYSTEM_PROMPT
 
 
 def create_llm() -> ChatAnthropic:
@@ -42,14 +42,16 @@ class StoryWeaveAgent:
     async def chat(self, messages: list[BaseMessage]) -> AIMessage:
         if not self._agent:
             raise RuntimeError("Agent not started. Call start() first.")
-        result = await self._agent.ainvoke({"messages": messages})
+        config = {"recursion_limit": AGENT_RECURSION_LIMIT}
+        result = await self._agent.ainvoke({"messages": messages}, config=config)
         return result["messages"][-1]
 
     async def chat_stream(self, messages: list[BaseMessage]):
         if not self._agent:
             raise RuntimeError("Agent not started. Call start() first.")
+        config = {"recursion_limit": AGENT_RECURSION_LIMIT}
         async for event in self._agent.astream_events(
-            {"messages": messages}, version="v2"
+            {"messages": messages}, config=config, version="v2"
         ):
             kind = event.get("event")
             if kind == "on_chat_model_stream":
