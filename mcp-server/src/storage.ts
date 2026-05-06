@@ -135,12 +135,13 @@ export function saveOutline(bookId: string, data: OutlineData): void {
 export function addNode(
   bookId: string,
   nodeType: 'volume' | 'act' | 'scene',
-  nodeData: Record<string, unknown>
+  nodeData: Record<string, unknown>,
+  position?: { x: number; y: number }
 ): OutlineNode | null {
   const outline = getOutline(bookId);
   const id = generateId();
-  const x = Math.round(300 + Math.random() * 200);
-  const y = Math.round(200 + Math.random() * 200);
+  const x = position?.x ?? Math.round(300 + Math.random() * 200);
+  const y = position?.y ?? Math.round(200 + Math.random() * 200);
 
   const baseData: Record<string, unknown> = {
     title: nodeData.title || `新${nodeType === 'volume' ? '卷' : nodeType === 'act' ? '幕' : '场景'}`,

@@ -235,8 +235,11 @@ export function registerTools(server: McpServer): void {
     async ({ bookId, volumes }) => {
       const result: Record<string, unknown>[] = [];
 
+      let volumeX = 50;
+
       for (const volData of volumes) {
-        const volNode = storage.addNode(bookId, 'volume', volData);
+        const volPosition = { x: volumeX, y: 50 };
+        const volNode = storage.addNode(bookId, 'volume', volData, volPosition);
         if (!volNode) {
           result.push({ error: `创建卷「${volData.title}」失败` });
           continue;
@@ -247,11 +250,20 @@ export function registerTools(server: McpServer): void {
           acts: [] as Record<string, unknown>[],
         };
 
+        const maxScenesPerAct = Math.max(
+          ...volData.acts.map(a => a.scenes?.length || 0),
+          1
+        );
+        const actSpacing = Math.max(maxScenesPerAct * 280, 320);
+        let actX = volumeX;
+
         for (const actData of volData.acts) {
+          const actPosition = { x: actX, y: 350 };
           const actInput = { ...actData, volume_id: volNode.id };
-          const actNode = storage.addNode(bookId, 'act', actInput);
+          const actNode = storage.addNode(bookId, 'act', actInput, actPosition);
           if (!actNode) {
             (volResult.acts as Record<string, unknown>[]).push({ error: `创建幕「${actData.title}」失败` });
+            actX += actSpacing;
             continue;
           }
 
@@ -261,9 +273,11 @@ export function registerTools(server: McpServer): void {
           };
 
           if (actData.scenes) {
-            for (const sceneData of actData.scenes) {
+            for (let si = 0; si < actData.scenes.length; si++) {
+              const sceneData = actData.scenes[si];
+              const scenePosition = { x: actX + si * 280, y: 650 };
               const sceneInput = { ...sceneData, act_id: actNode.id };
-              const sceneNode = storage.addNode(bookId, 'scene', sceneInput);
+              const sceneNode = storage.addNode(bookId, 'scene', sceneInput, scenePosition);
               if (sceneNode) {
                 (actResult.scenes as Record<string, unknown>[]).push({
                   scene: { id: sceneNode.id, title: sceneNode.data.title },
@@ -273,8 +287,10 @@ export function registerTools(server: McpServer): void {
           }
 
           (volResult.acts as Record<string, unknown>[]).push(actResult);
+          actX += actSpacing;
         }
 
+        volumeX = actX + 100;
         result.push(volResult);
       }
 

@@ -462,11 +462,7 @@ const openBook = async (book: BookMetadata) => {
     });
 
     await new Promise(resolve => setTimeout(resolve, 100));
-    autoLayout();
-
-    nextTick(() => {
-      skipAutoSave = false;
-    });
+    await autoLayout();
   } catch (error) {
     console.error('Error opening book:', error);
     showToastMessage('打开书籍失败');
@@ -530,7 +526,7 @@ watch(isAiStreaming, async (streaming, wasStreaming) => {
       const updatedBook = await getBookDetail(currentBook.value.id);
       currentBook.value = updatedBook;
       await new Promise(resolve => setTimeout(resolve, 100));
-      autoLayout();
+      await autoLayout();
     } catch (error) {
       console.error('Error reloading outline after AI:', error);
     } finally {
@@ -550,44 +546,63 @@ watch(
   { deep: true }
 );
 
-const autoLayout = () => {
+const autoLayout = async () => {
+  if (nodes.value.length === 0) return;
+
   skipAutoSave = true;
-  const g = new dagre.graphlib.Graph();
-  g.setGraph({
-    rankdir: 'TB',
-    align: 'UL',
-    nodesep: 100,
-    ranksep: 150,
-  });
 
-  g.setDefaultEdgeLabel(() => ({}));
+  try {
+    const g = new dagre.graphlib.Graph();
+    g.setGraph({
+      rankdir: 'TB',
+      nodesep: 80,
+      ranksep: 120,
+    });
 
-  nodes.value.forEach(node => {
-    g.setNode(node.id, { width: 280, height: 280 });
-  });
+    g.setDefaultEdgeLabel(() => ({}));
 
-  edges.value.forEach(edge => {
-    g.setEdge(edge.source, edge.target);
-  });
+    nodes.value.forEach(node => {
+      const nodeWidth = 280;
+      const nodeHeight = node.data.type === 'volume' ? 220 : node.data.type === 'act' ? 200 : 180;
+      g.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+    });
 
-  dagre.layout(g);
+    edges.value.forEach(edge => {
+      g.setEdge(edge.source, edge.target);
+    });
 
-  const newNodes = nodes.value.map(node => {
-    const nodeWithPosition = g.node(node.id);
-    return {
-      ...node,
-      position: {
-        x: Math.round(nodeWithPosition.x - 140),
-        y: Math.round(nodeWithPosition.y - 140),
-      },
-    };
-  });
+    dagre.layout(g);
 
-  nodes.value = [...newNodes];
+    const newNodes = nodes.value.map(node => {
+      const nodeWithPosition = g.node(node.id);
+      if (!nodeWithPosition) {
+        return node;
+      }
+      const nodeWidth = 280;
+      const nodeHeight = node.data.type === 'volume' ? 220 : node.data.type === 'act' ? 200 : 180;
+      return {
+        ...node,
+        position: {
+          x: Math.round(nodeWithPosition.x - nodeWidth / 2),
+          y: Math.round(nodeWithPosition.y - nodeHeight / 2),
+        },
+      };
+    });
 
-  nextTick(() => {
-    skipAutoSave = false;
-  });
+    nodes.value = [...newNodes];
+
+    if (currentBook.value) {
+      await nextTick();
+      const safeEdges = normalizeEdges(edges.value);
+      await saveBookData(currentBook.value.file_path, nodes.value, safeEdges);
+    }
+  } catch (error) {
+    console.error('Auto layout error:', error);
+  } finally {
+    nextTick(() => {
+      skipAutoSave = false;
+    });
+  }
 };
 
 const debounce = (func: Function, delay: number) => {
