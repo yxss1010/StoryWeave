@@ -19,3 +19,4 @@ src-tauri/Cargo.lock
 
 .DS_Store
 Thumbs.db
+*.pdf
