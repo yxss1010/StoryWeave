@@ -254,11 +254,11 @@ export function registerTools(server: McpServer): void {
           ...volData.acts.map(a => a.scenes?.length || 0),
           1
         );
-        const actSpacing = Math.max(maxScenesPerAct * 280, 320);
+        const actSpacing = Math.max(maxScenesPerAct * 300, 380);
         let actX = volumeX;
 
         for (const actData of volData.acts) {
-          const actPosition = { x: actX, y: 350 };
+          const actPosition = { x: actX, y: 400 };
           const actInput = { ...actData, volume_id: volNode.id };
           const actNode = storage.addNode(bookId, 'act', actInput, actPosition);
           if (!actNode) {
@@ -275,7 +275,7 @@ export function registerTools(server: McpServer): void {
           if (actData.scenes) {
             for (let si = 0; si < actData.scenes.length; si++) {
               const sceneData = actData.scenes[si];
-              const scenePosition = { x: actX + si * 280, y: 650 };
+              const scenePosition = { x: actX + si * 300, y: 800 };
               const sceneInput = { ...sceneData, act_id: actNode.id };
               const sceneNode = storage.addNode(bookId, 'scene', sceneInput, scenePosition);
               if (sceneNode) {
@@ -290,7 +290,7 @@ export function registerTools(server: McpServer): void {
           actX += actSpacing;
         }
 
-        volumeX = actX + 100;
+        volumeX = actX + 120;
         result.push(volResult);
       }
 

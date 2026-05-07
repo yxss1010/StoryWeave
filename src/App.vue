@@ -555,15 +555,15 @@ const autoLayout = async () => {
     const g = new dagre.graphlib.Graph();
     g.setGraph({
       rankdir: 'TB',
-      nodesep: 80,
-      ranksep: 120,
+      nodesep: 100,
+      ranksep: 200,
     });
 
     g.setDefaultEdgeLabel(() => ({}));
 
     nodes.value.forEach(node => {
       const nodeWidth = 280;
-      const nodeHeight = node.data.type === 'volume' ? 220 : node.data.type === 'act' ? 200 : 180;
+      const nodeHeight = node.data.type === 'volume' ? 300 : node.data.type === 'act' ? 280 : 260;
       g.setNode(node.id, { width: nodeWidth, height: nodeHeight });
     });
 
@@ -579,7 +579,7 @@ const autoLayout = async () => {
         return node;
       }
       const nodeWidth = 280;
-      const nodeHeight = node.data.type === 'volume' ? 220 : node.data.type === 'act' ? 200 : 180;
+      const nodeHeight = node.data.type === 'volume' ? 300 : node.data.type === 'act' ? 280 : 260;
       return {
         ...node,
         position: {
