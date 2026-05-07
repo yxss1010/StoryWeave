@@ -13,6 +13,12 @@
           </div>
         </div>
         <div class="ai-header-right">
+          <button v-if="currentBookId" class="ai-action-btn" @click="showConversationList = true" title="历史会话">
+            <History :size="14" />
+          </button>
+          <button v-if="currentBookId" class="ai-action-btn" @click="handleNewConversation" title="新建会话">
+            <Plus :size="14" />
+          </button>
           <button v-if="messages.length > 0" class="ai-action-btn" @click="handleClear" title="清空对话">
             <Trash2 :size="14" />
           </button>
@@ -22,8 +28,42 @@
         </div>
       </div>
 
+      <div v-if="showConversationList" class="conversation-list-overlay">
+        <div class="conversation-list-header">
+          <h3 class="conv-list-title">历史会话</h3>
+          <button class="conv-list-close" @click="showConversationList = false">
+            <X :size="16" />
+          </button>
+        </div>
+        <div class="conversation-list-body">
+          <button class="conv-new-btn" @click="handleNewConversation">
+            <Plus :size="16" />
+            <span>新建会话</span>
+          </button>
+          <div v-if="conversations.length === 0" class="conv-empty">
+            <MessageSquare :size="24" :stroke-width="1" />
+            <p>暂无历史会话</p>
+          </div>
+          <div
+            v-for="conv in conversations"
+            :key="conv.id"
+            class="conv-item"
+            :class="{ 'conv-item-active': currentConversationId === conv.id }"
+            @click="handleSelectConversation(conv.id)"
+          >
+            <div class="conv-item-info">
+              <span class="conv-item-title">{{ conv.title }}</span>
+              <span class="conv-item-time">{{ formatTime(conv.updatedAt) }}</span>
+            </div>
+            <button class="conv-item-delete" @click.stop="handleDeleteConversation(conv.id)" title="删除会话">
+              <Trash2 :size="12" />
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div class="ai-messages" ref="messagesContainer">
-        <div v-if="messages.length === 0" class="ai-welcome">
+        <div v-if="messages.length === 0 && !isStreaming" class="ai-welcome">
           <div class="welcome-icon">📖</div>
           <p class="welcome-text">描述你的小说灵感，AI 将为你生成完整大纲</p>
           <div class="quick-prompts">
@@ -113,7 +153,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick, watch, onMounted } from 'vue';
-import { Sparkles, X, Send, Trash2 } from 'lucide-vue-next';
+import { Sparkles, X, Send, Trash2, Plus, History, MessageSquare } from 'lucide-vue-next';
 import { Marked } from 'marked';
 import { useAiChat } from '../composables/useAiChat';
 
@@ -129,7 +169,12 @@ const {
   streamingText,
   activeToolEvents,
   currentBookId,
+  currentConversationId,
+  conversations,
   switchBook,
+  switchConversation,
+  startNewConversation,
+  deleteConversation,
   sendMessage,
   clearMessages,
 } = useAiChat();
@@ -137,6 +182,7 @@ const {
 const inputText = ref('');
 const messagesContainer = ref<HTMLElement | null>(null);
 const inputRef = ref<HTMLTextAreaElement | null>(null);
+const showConversationList = ref(false);
 
 const MIN_WIDTH = 360;
 const MAX_WIDTH = 720;
@@ -173,6 +219,21 @@ const marked = new Marked({
 function renderMarkdown(text: string): string {
   if (!text) return '';
   return marked.parse(text) as string;
+}
+
+function formatTime(timestamp: number): string {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHour = Math.floor(diffMs / 3600000);
+  const diffDay = Math.floor(diffMs / 86400000);
+
+  if (diffMin < 1) return '刚刚';
+  if (diffMin < 60) return `${diffMin}分钟前`;
+  if (diffHour < 24) return `${diffHour}小时前`;
+  if (diffDay < 7) return `${diffDay}天前`;
+  return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
 const quickPrompts = [
@@ -217,7 +278,21 @@ async function handleSend() {
 }
 
 async function handleClear() {
-  await clearMessages(currentBookId.value || undefined);
+  await clearMessages(currentConversationId.value || undefined);
+}
+
+async function handleNewConversation() {
+  await startNewConversation();
+  showConversationList.value = false;
+}
+
+async function handleSelectConversation(convId: string) {
+  await switchConversation(convId);
+  showConversationList.value = false;
+}
+
+async function handleDeleteConversation(convId: string) {
+  await deleteConversation(convId);
 }
 
 onMounted(() => {
@@ -344,8 +419,8 @@ defineExpose({ switchBook });
 }
 
 .ai-action-btn:hover {
-  background: #fef2f2;
-  color: #ef4444;
+  background: #f3f4f6;
+  color: var(--text-primary);
 }
 
 .ai-close {
@@ -363,6 +438,175 @@ defineExpose({ switchBook });
 .ai-close:hover {
   background: #f3f4f6;
   color: var(--text-primary);
+}
+
+.conversation-list-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--card-bg);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+}
+
+.conversation-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.conv-list-title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.conv-list-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.conv-list-close:hover {
+  background: #f3f4f6;
+  color: var(--text-primary);
+}
+
+.conversation-list-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.conversation-list-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.conversation-list-body::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 2px;
+}
+
+.conv-new-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: rgba(79, 70, 229, 0.06);
+  border: 1px dashed rgba(79, 70, 229, 0.3);
+  border-radius: 10px;
+  color: var(--primary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.conv-new-btn:hover {
+  background: rgba(79, 70, 229, 0.1);
+  border-color: var(--primary);
+}
+
+.conv-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px 16px;
+  color: #9ca3af;
+}
+
+.conv-empty p {
+  font-size: 0.8125rem;
+  margin: 0;
+}
+
+.conv-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.conv-item:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.conv-item-active {
+  background: #eff6ff;
+  border-color: rgba(79, 70, 229, 0.3);
+}
+
+.conv-item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.conv-item-title {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conv-item-time {
+  font-size: 0.6875rem;
+  color: #9ca3af;
+}
+
+.conv-item-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+  opacity: 0;
+}
+
+.conv-item:hover .conv-item-delete {
+  opacity: 1;
+}
+
+.conv-item-delete:hover {
+  background: #fef2f2;
+  color: #ef4444;
 }
 
 .ai-messages {

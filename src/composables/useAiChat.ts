@@ -2,8 +2,17 @@ import { ref } from 'vue';
 import Dexie, { type Table } from 'dexie';
 import { streamChat, type ChatMessage, type ToolEvent } from '../services/agent';
 
+interface Conversation {
+  id: string;
+  bookId: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 interface StoredMessage {
   id?: number;
+  conversationId: string;
   bookId: string;
   role: 'user' | 'assistant';
   content: string;
@@ -18,28 +27,79 @@ interface DisplayMessage {
 }
 
 class ChatDB extends Dexie {
+  conversations!: Table<Conversation>;
   messages!: Table<StoredMessage>;
 
   constructor() {
     super('StoryWeaveChat');
-    this.version(1).stores({
-      messages: '++id, bookId, createdAt',
+    this.version(2).stores({
+      conversations: 'id, bookId, updatedAt',
+      messages: '++id, conversationId, bookId, createdAt',
     });
   }
 }
 
 const db = new ChatDB();
 
+function generateId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
+}
+
 const messages = ref<DisplayMessage[]>([]);
 const isStreaming = ref(false);
 const streamingText = ref('');
 const activeToolEvents = ref<ToolEvent[]>([]);
-let currentBookId = ref<string | null>(null);
+const currentBookId = ref<string | null>(null);
+const currentConversationId = ref<string | null>(null);
+const conversations = ref<Conversation[]>([]);
 
-async function loadMessages(bookId: string) {
-  const stored = await db.messages
+async function loadConversations(bookId: string) {
+  const list = await db.conversations
     .where('bookId')
     .equals(bookId)
+    .reverse()
+    .sortBy('updatedAt');
+  conversations.value = list;
+}
+
+async function createConversation(bookId: string, title?: string): Promise<string> {
+  const id = generateId();
+  const now = Date.now();
+  const conv: Conversation = {
+    id,
+    bookId,
+    title: title || `会话 ${conversations.value.length + 1}`,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db.conversations.add(conv);
+  conversations.value.unshift(conv);
+  return id;
+}
+
+async function deleteConversation(conversationId: string) {
+  await db.messages.where('conversationId').equals(conversationId).delete();
+  await db.conversations.delete(conversationId);
+  conversations.value = conversations.value.filter(c => c.id !== conversationId);
+  if (currentConversationId.value === conversationId) {
+    currentConversationId.value = null;
+    messages.value = [];
+  }
+}
+
+async function updateConversationTitle(conversationId: string, title: string) {
+  await db.conversations.update(conversationId, { title, updatedAt: Date.now() });
+  const conv = conversations.value.find(c => c.id === conversationId);
+  if (conv) {
+    conv.title = title;
+    conv.updatedAt = Date.now();
+  }
+}
+
+async function loadMessages(conversationId: string) {
+  const stored = await db.messages
+    .where('conversationId')
+    .equals(conversationId)
     .sortBy('createdAt');
 
   messages.value = stored.map((s) => ({
@@ -49,19 +109,26 @@ async function loadMessages(bookId: string) {
   }));
 }
 
-async function saveMessage(bookId: string, msg: DisplayMessage) {
+async function saveMessage(conversationId: string, bookId: string, msg: DisplayMessage) {
   await db.messages.add({
+    conversationId,
     bookId,
     role: msg.role,
     content: msg.content,
     toolEvents: JSON.stringify(msg.toolEvents),
     createdAt: Date.now(),
   });
+  await db.conversations.update(conversationId, { updatedAt: Date.now() });
+  const conv = conversations.value.find(c => c.id === conversationId);
+  if (conv) {
+    conv.updatedAt = Date.now();
+  }
 }
 
-async function clearMessages(bookId?: string) {
-  if (bookId) {
-    await db.messages.where('bookId').equals(bookId).delete();
+async function clearMessages(conversationId?: string) {
+  if (conversationId) {
+    await db.messages.where('conversationId').equals(conversationId).delete();
+    await db.conversations.update(conversationId, { updatedAt: Date.now() });
   } else {
     await db.messages.clear();
   }
@@ -69,22 +136,51 @@ async function clearMessages(bookId?: string) {
 }
 
 function switchBook(bookId: string | null) {
-  if (currentBookId.value === bookId) return;
   currentBookId.value = bookId;
+  currentConversationId.value = null;
+  messages.value = [];
   if (bookId) {
-    loadMessages(bookId);
+    loadConversations(bookId);
   } else {
-    messages.value = [];
+    conversations.value = [];
   }
+}
+
+async function switchConversation(conversationId: string) {
+  currentConversationId.value = conversationId;
+  await loadMessages(conversationId);
+}
+
+async function startNewConversation() {
+  const bookId = currentBookId.value;
+  if (!bookId) return;
+  const id = await createConversation(bookId);
+  currentConversationId.value = id;
+  messages.value = [];
 }
 
 async function sendMessage(text: string) {
   const bookId = currentBookId.value;
   if (!text.trim() || isStreaming.value) return;
 
+  if (!currentConversationId.value) {
+    if (bookId) {
+      const id = await createConversation(bookId, text.slice(0, 30));
+      currentConversationId.value = id;
+    } else {
+      return;
+    }
+  }
+
+  const convId = currentConversationId.value;
+
+  if (messages.value.length === 0) {
+    await updateConversationTitle(convId, text.slice(0, 30));
+  }
+
   const userMsg: DisplayMessage = { role: 'user', content: text, toolEvents: [] };
   messages.value.push(userMsg);
-  if (bookId) await saveMessage(bookId, userMsg);
+  await saveMessage(convId, bookId!, userMsg);
 
   isStreaming.value = true;
   streamingText.value = '';
@@ -112,7 +208,7 @@ async function sendMessage(text: string) {
           toolEvents: [...activeToolEvents.value],
         };
         messages.value.push(assistantMsg);
-        if (bookId) await saveMessage(bookId, assistantMsg);
+        await saveMessage(convId, bookId!, assistantMsg);
         streamingText.value = '';
         activeToolEvents.value = [];
         isStreaming.value = false;
@@ -124,7 +220,7 @@ async function sendMessage(text: string) {
           toolEvents: [],
         };
         messages.value.push(errorMsg);
-        if (bookId) await saveMessage(bookId, errorMsg);
+        await saveMessage(convId, bookId!, errorMsg);
         streamingText.value = '';
         activeToolEvents.value = [];
         isStreaming.value = false;
@@ -137,7 +233,7 @@ async function sendMessage(text: string) {
       toolEvents: [],
     };
     messages.value.push(errorMsg);
-    if (bookId) await saveMessage(bookId, errorMsg);
+    await saveMessage(convId, bookId!, errorMsg);
     isStreaming.value = false;
     streamingText.value = '';
     activeToolEvents.value = [];
@@ -151,7 +247,12 @@ export function useAiChat() {
     streamingText,
     activeToolEvents,
     currentBookId,
+    currentConversationId,
+    conversations,
     switchBook,
+    switchConversation,
+    startNewConversation,
+    deleteConversation,
     sendMessage,
     clearMessages,
   };
