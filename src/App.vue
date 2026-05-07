@@ -44,7 +44,21 @@
           <Sparkles :size="18" />
           <span>自动排列</span>
         </button>
+        <div class="toolbar-divider"></div>
+        <button class="toolbar-btn" :class="{ 'toolbar-btn-active': showOutlineTree }" @click="showOutlineTree = !showOutlineTree">
+          <ListTree :size="18" />
+          <span>导航树</span>
+        </button>
       </aside>
+
+      <OutlineTree
+        v-if="showOutlineTree"
+        :nodes="nodes"
+        :edges="edges"
+        :selected-node-id="selectedNode?.id || null"
+        @close="showOutlineTree = false"
+        @navigate="navigateToNode"
+      />
 
       <div class="canvas-wrapper">
         <VueFlow
@@ -56,6 +70,7 @@
           :snap-to-grid="false"
           :is-valid-connection="() => true"
           :default-edge-options="{ type: 'smoothstep' }"
+          :only-render-visible-elements="true"
           @node-click="handleNodeClick"
           @edge-click="handleEdgeClick"
           @connect="handleConnect"
@@ -118,6 +133,7 @@
       :current-node-id="selectedNode.id"
       @close="closeEditor"
       @delete="requestDeleteNode"
+      @locate="navigateToNode(selectedNode!.id)"
       @update-parent="handleUpdateParent"
     />
 
@@ -161,13 +177,14 @@ import '@vue-flow/core/dist/style.css';
 import '@vue-flow/controls/dist/style.css';
 import '@vue-flow/minimap/dist/style.css';
 import type { Node, Edge, NodeMouseEvent, Connection, NodeChange } from '@vue-flow/core';
-import { ArrowLeft, Save, BookOpen, Drama, Clapperboard, Sparkles, FileText } from 'lucide-vue-next';
+import { ArrowLeft, Save, BookOpen, Drama, Clapperboard, Sparkles, FileText, ListTree } from 'lucide-vue-next';
 import PlotNode from './components/PlotNode.vue';
 import EditorPanel from './components/EditorPanel.vue';
 import BookshelfView from './components/BookshelfView.vue';
 import ConfirmModal from './components/ConfirmModal.vue';
 import BookInfoPanel from './components/BookInfoPanel.vue';
 import AiPanel from './components/AiPanel.vue';
+import OutlineTree from './components/OutlineTree.vue';
 import { loadBookData, saveBookData, updateBookMetadata, getBookDetail } from './services/tauri';
 import type { BookMetadata } from './services/tauri';
 import { useAiChat } from './composables/useAiChat';
@@ -208,7 +225,7 @@ const currentBook = ref<BookMetadata | null>(null);
 const nodes = ref<Node[]>([]);
 const edges = ref<Edge[]>([]);
 
-const { addEdges, applyNodeChanges } = useVueFlow();
+const { addEdges, applyNodeChanges, fitView } = useVueFlow();
 
 const selectedNode = ref<Node | null>(null);
 const selectedEdge = ref<Edge | null>(null);
@@ -220,6 +237,7 @@ const isLoading = ref(false);
 const showDeleteConfirm = ref(false);
 const showAiPanel = ref(false);
 const showBookInfo = ref(false);
+const showOutlineTree = ref(false);
 
 const { isStreaming: isAiStreaming } = useAiChat();
 const aiPanelRef = ref<InstanceType<typeof AiPanel> | null>(null);
@@ -236,6 +254,13 @@ const toggleAiPanel = () => {
       }
     });
   }
+};
+
+const navigateToNode = (nodeId: string) => {
+  const node = nodes.value.find(n => n.id === nodeId);
+  if (!node) return;
+  selectedNode.value = node;
+  fitView({ nodes: [nodeId], padding: 0.5, duration: 300 });
 };
 
 const getNodeTitle = (id: string): string => {
@@ -749,6 +774,12 @@ const debouncedSaveBook = debounce(async (nodes: Node[], edges: Edge[]) => {
   background: var(--primary-hover);
   color: #fff;
   transform: translateX(2px);
+}
+
+.toolbar-btn-active {
+  background: #eff6ff;
+  color: var(--primary);
+  border-color: var(--primary);
 }
 
 .toolbar-divider {

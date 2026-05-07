@@ -5,13 +5,22 @@
         <Pencil :size="18" />
         节点编辑
       </h2>
-      <button
-        class="close-btn"
-        @click="$emit('close')"
-        title="关闭编辑器"
-      >
-        <X :size="18" />
-      </button>
+      <div class="header-actions">
+        <button
+          class="locate-btn"
+          @click="$emit('locate')"
+          title="定位到该节点"
+        >
+          <Crosshair :size="18" />
+        </button>
+        <button
+          class="close-btn"
+          @click="$emit('close')"
+          title="关闭编辑器"
+        >
+          <X :size="18" />
+        </button>
+      </div>
     </div>
 
     <form @submit.prevent class="editor-form">
@@ -210,7 +219,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import type { Node } from '@vue-flow/core';
-import { Pencil, X, Trash2 } from 'lucide-vue-next';
+import { Pencil, X, Trash2, Crosshair } from 'lucide-vue-next';
 
 interface BasePlotNodeData {
   title: string;
@@ -248,6 +257,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'close'): void;
   (e: 'delete'): void;
+  (e: 'locate'): void;
   (e: 'updateParent', parentId: string, parentType: 'volume' | 'act'): void;
 }>();
 
@@ -345,6 +355,29 @@ const deleteNode = () => {
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.locate-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  transition: var(--transition);
+}
+
+.locate-btn:hover {
+  background: #eff6ff;
+  color: var(--primary);
 }
 
 .close-btn {
