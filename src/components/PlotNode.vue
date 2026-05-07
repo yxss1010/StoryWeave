@@ -42,6 +42,14 @@
 
     <div class="divider" :class="{ 'divider-volume': data.type === 'volume', 'divider-act': data.type === 'act', 'divider-scene': data.type === 'scene' }"></div>
 
+    <div v-if="data.description" class="description-section">
+      <div class="section-label">
+        <span>📝</span>
+        <span>描述</span>
+      </div>
+      <p class="content-text">{{ data.description }}</p>
+    </div>
+
     <div class="change-section">
       <div class="section-label">
         <span>🔄</span>
@@ -120,6 +128,7 @@ import { inject } from 'vue';
 interface BasePlotNodeData {
   title: string;
   type: 'volume' | 'act' | 'scene';
+  description: string;
   change_before: string;
   change_after: string;
 }
@@ -285,6 +294,10 @@ const getActTitle = (actId: string) => {
 
 .divider-scene {
   background: linear-gradient(90deg, transparent 0%, #06b6d4 50%, transparent 100%);
+}
+
+.description-section {
+  margin-bottom: 16px;
 }
 
 .change-section {

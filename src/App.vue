@@ -193,6 +193,7 @@ import dagre from 'dagre';
 interface BasePlotNodeData {
   title: string;
   type: 'volume' | 'act' | 'scene';
+  description: string;
   change_before: string;
   change_after: string;
 }
@@ -477,7 +478,15 @@ const openBook = async (book: BookMetadata) => {
   isLoading.value = true;
   try {
     const { nodes: loadedNodes, edges: loadedEdges } = await loadBookData(book.file_path);
-    nodes.value = loadedNodes;
+    nodes.value = loadedNodes.map(n => ({
+      ...n,
+      data: {
+        ...n.data,
+        description: (n.data as Record<string, unknown>).description ?? '',
+        change_before: (n.data as Record<string, unknown>).change_before ?? '',
+        change_after: (n.data as Record<string, unknown>).change_after ?? '',
+      },
+    }));
     edges.value = loadedEdges;
     currentBook.value = book;
     currentView.value = 'editor';
@@ -545,7 +554,15 @@ watch(isAiStreaming, async (streaming, wasStreaming) => {
     skipAutoSave = true;
     try {
       const { nodes: loadedNodes, edges: loadedEdges } = await loadBookData(currentBook.value.file_path);
-      nodes.value = loadedNodes;
+      nodes.value = loadedNodes.map(n => ({
+        ...n,
+        data: {
+          ...n.data,
+          description: (n.data as Record<string, unknown>).description ?? '',
+          change_before: (n.data as Record<string, unknown>).change_before ?? '',
+          change_after: (n.data as Record<string, unknown>).change_after ?? '',
+        },
+      }));
       edges.value = loadedEdges;
       selectedNode.value = null;
       const updatedBook = await getBookDetail(currentBook.value.id);

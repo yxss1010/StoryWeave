@@ -1,5 +1,6 @@
 <template>
-  <div class="editor-panel">
+  <div class="editor-panel" :style="{ width: panelWidth + 'px' }">
+    <div class="resize-handle" @mousedown="startResize"></div>
     <div class="editor-header">
       <h2 class="header-title">
         <Pencil :size="18" />
@@ -49,6 +50,16 @@
             <span class="type-label">{{ t.label }}</span>
           </button>
         </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">描述</label>
+        <textarea
+          class="form-textarea"
+          rows="3"
+          v-model="nodeData.description"
+          placeholder="节点的整体描述..."
+        ></textarea>
       </div>
 
       <div class="form-group">
@@ -224,6 +235,7 @@ import { Pencil, X, Trash2, Crosshair } from 'lucide-vue-next';
 interface BasePlotNodeData {
   title: string;
   type: 'volume' | 'act' | 'scene';
+  description: string;
   change_before: string;
   change_after: string;
 }
@@ -262,6 +274,33 @@ const emit = defineEmits<{
 }>();
 
 const newCharacter = ref('');
+
+const MIN_WIDTH = 320;
+const MAX_WIDTH = 640;
+const panelWidth = ref(400);
+
+function startResize(e: MouseEvent) {
+  e.preventDefault();
+  const startX = e.clientX;
+  const startWidth = panelWidth.value;
+
+  function onMouseMove(ev: MouseEvent) {
+    const delta = startX - ev.clientX;
+    panelWidth.value = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + delta));
+  }
+
+  function onMouseUp() {
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }
+
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', onMouseUp);
+}
 
 const typeOptions = [
   { value: 'volume' as const, label: '卷', icon: '📚' },
@@ -327,7 +366,8 @@ const deleteNode = () => {
   right: 0;
   top: 0;
   height: 100vh;
-  width: 400px;
+  min-width: 320px;
+  max-width: 640px;
   background: var(--card-bg);
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.08);
   border-left: 1px solid #e5e7eb;
@@ -335,6 +375,21 @@ const deleteNode = () => {
   flex-direction: column;
   overflow: hidden;
   z-index: 9999;
+}
+
+.resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 1;
+}
+
+.resize-handle:hover,
+.resize-handle:active {
+  background: rgba(79, 70, 229, 0.15);
 }
 
 .editor-header {

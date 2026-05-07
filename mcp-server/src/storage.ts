@@ -146,6 +146,7 @@ export function addNode(
   const baseData: Record<string, unknown> = {
     title: nodeData.title || `新${nodeType === 'volume' ? '卷' : nodeType === 'act' ? '幕' : '场景'}`,
     type: nodeType,
+    description: nodeData.description || '',
     change_before: nodeData.change_before || '',
     change_after: nodeData.change_after || '',
   };
@@ -256,6 +257,7 @@ export function getOutlineTree(bookId: string): Record<string, unknown> {
             title: scene!.data.title,
             location: scene!.data.location,
             characters: scene!.data.characters,
+            description: scene!.data.description || '',
             change_before: scene!.data.change_before,
             change_after: scene!.data.change_after,
           }));
@@ -265,6 +267,7 @@ export function getOutlineTree(bookId: string): Record<string, unknown> {
           title: act!.data.title,
           act_number: act!.data.act_number,
           conflict: act!.data.conflict,
+          description: act!.data.description || '',
           change_before: act!.data.change_before,
           change_after: act!.data.change_after,
           scenes: actScenes,
@@ -276,6 +279,7 @@ export function getOutlineTree(bookId: string): Record<string, unknown> {
       title: vol.data.title,
       volume_number: vol.data.volume_number,
       summary: vol.data.summary,
+      description: vol.data.description || '',
       change_before: vol.data.change_before,
       change_after: vol.data.change_after,
       acts: volActs,
