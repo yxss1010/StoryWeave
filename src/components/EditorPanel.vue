@@ -275,9 +275,9 @@ const emit = defineEmits<{
 
 const newCharacter = ref('');
 
-const MIN_WIDTH = 320;
-const MAX_WIDTH = 640;
-const panelWidth = ref(400);
+const MIN_WIDTH = 360;
+const MAX_WIDTH = 720;
+const panelWidth = ref(480);
 
 function startResize(e: MouseEvent) {
   e.preventDefault();
@@ -366,8 +366,8 @@ const deleteNode = () => {
   right: 0;
   top: 0;
   height: 100vh;
-  min-width: 320px;
-  max-width: 640px;
+  min-width: 360px;
+  max-width: 720px;
   background: var(--card-bg);
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.08);
   border-left: 1px solid #e5e7eb;

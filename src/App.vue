@@ -473,6 +473,11 @@ const normalizeEdges = (edges: Edge[]) => {
   }));
 };
 
+function normalizeText(text: unknown): string {
+  if (text == null) return '';
+  return String(text).replace(/\\n/g, '\n');
+}
+
 const openBook = async (book: BookMetadata) => {
   skipAutoSave = true;
   isLoading.value = true;
@@ -482,9 +487,9 @@ const openBook = async (book: BookMetadata) => {
       ...n,
       data: {
         ...n.data,
-        description: (n.data as Record<string, unknown>).description ?? '',
-        change_before: (n.data as Record<string, unknown>).change_before ?? '',
-        change_after: (n.data as Record<string, unknown>).change_after ?? '',
+        description: normalizeText((n.data as Record<string, unknown>).description),
+        change_before: normalizeText((n.data as Record<string, unknown>).change_before),
+        change_after: normalizeText((n.data as Record<string, unknown>).change_after),
       },
     }));
     edges.value = loadedEdges;
@@ -558,9 +563,9 @@ watch(isAiStreaming, async (streaming, wasStreaming) => {
         ...n,
         data: {
           ...n.data,
-          description: (n.data as Record<string, unknown>).description ?? '',
-          change_before: (n.data as Record<string, unknown>).change_before ?? '',
-          change_after: (n.data as Record<string, unknown>).change_after ?? '',
+          description: normalizeText((n.data as Record<string, unknown>).description),
+          change_before: normalizeText((n.data as Record<string, unknown>).change_before),
+          change_after: normalizeText((n.data as Record<string, unknown>).change_after),
         },
       }));
       edges.value = loadedEdges;
