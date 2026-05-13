@@ -139,11 +139,8 @@ function switchBook(bookId: string | null) {
   currentBookId.value = bookId;
   currentConversationId.value = null;
   messages.value = [];
-  if (bookId) {
-    loadConversations(bookId);
-  } else {
-    conversations.value = [];
-  }
+  const convBookId = bookId || '__bookshelf__';
+  loadConversations(convBookId);
 }
 
 async function switchConversation(conversationId: string) {
@@ -152,8 +149,7 @@ async function switchConversation(conversationId: string) {
 }
 
 async function startNewConversation() {
-  const bookId = currentBookId.value;
-  if (!bookId) return;
+  const bookId = currentBookId.value || '__bookshelf__';
   const id = await createConversation(bookId);
   currentConversationId.value = id;
   messages.value = [];
@@ -164,15 +160,13 @@ async function sendMessage(text: string) {
   if (!text.trim() || isStreaming.value) return;
 
   if (!currentConversationId.value) {
-    if (bookId) {
-      const id = await createConversation(bookId, text.slice(0, 30));
-      currentConversationId.value = id;
-    } else {
-      return;
-    }
+    const convBookId = bookId || '__bookshelf__';
+    const id = await createConversation(convBookId, text.slice(0, 30));
+    currentConversationId.value = id;
   }
 
   const convId = currentConversationId.value;
+  const convBookId = bookId || '__bookshelf__';
 
   if (messages.value.length === 0) {
     await updateConversationTitle(convId, text.slice(0, 30));
@@ -180,7 +174,7 @@ async function sendMessage(text: string) {
 
   const userMsg: DisplayMessage = { role: 'user', content: text, toolEvents: [] };
   messages.value.push(userMsg);
-  await saveMessage(convId, bookId!, userMsg);
+  await saveMessage(convId, convBookId, userMsg);
 
   isStreaming.value = true;
   streamingText.value = '';
@@ -208,7 +202,7 @@ async function sendMessage(text: string) {
           toolEvents: [...activeToolEvents.value],
         };
         messages.value.push(assistantMsg);
-        await saveMessage(convId, bookId!, assistantMsg);
+        await saveMessage(convId, convBookId, assistantMsg);
         streamingText.value = '';
         activeToolEvents.value = [];
         isStreaming.value = false;
@@ -220,7 +214,7 @@ async function sendMessage(text: string) {
           toolEvents: [],
         };
         messages.value.push(errorMsg);
-        await saveMessage(convId, bookId!, errorMsg);
+        await saveMessage(convId, convBookId, errorMsg);
         streamingText.value = '';
         activeToolEvents.value = [];
         isStreaming.value = false;
@@ -233,7 +227,7 @@ async function sendMessage(text: string) {
       toolEvents: [],
     };
     messages.value.push(errorMsg);
-    await saveMessage(convId, bookId!, errorMsg);
+    await saveMessage(convId, convBookId, errorMsg);
     isStreaming.value = false;
     streamingText.value = '';
     activeToolEvents.value = [];
