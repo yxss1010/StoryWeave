@@ -52,6 +52,7 @@ const activeToolEvents = ref<ToolEvent[]>([]);
 const currentBookId = ref<string | null>(null);
 const currentConversationId = ref<string | null>(null);
 const conversations = ref<Conversation[]>([]);
+let abortController: AbortController | null = null;
 
 async function loadConversations(bookId: string) {
   const list = await db.conversations
@@ -140,7 +141,11 @@ function switchBook(bookId: string | null) {
   currentConversationId.value = null;
   messages.value = [];
   const convBookId = bookId || '__bookshelf__';
-  loadConversations(convBookId);
+  loadConversations(convBookId).then(() => {
+    if (conversations.value.length > 0) {
+      switchConversation(conversations.value[0].id);
+    }
+  });
 }
 
 async function switchConversation(conversationId: string) {
@@ -179,6 +184,7 @@ async function sendMessage(text: string) {
   isStreaming.value = true;
   streamingText.value = '';
   activeToolEvents.value = [];
+  abortController = new AbortController();
 
   const chatMessages: ChatMessage[] = messages.value.map((m) => ({
     role: m.role,
@@ -196,41 +202,76 @@ async function sendMessage(text: string) {
         activeToolEvents.value = [...activeToolEvents.value, event];
       },
       async () => {
-        const assistantMsg: DisplayMessage = {
-          role: 'assistant',
-          content: streamingText.value,
-          toolEvents: [...activeToolEvents.value],
-        };
-        messages.value.push(assistantMsg);
-        await saveMessage(convId, convBookId, assistantMsg);
+        const content = streamingText.value;
+        if (content) {
+          const assistantMsg: DisplayMessage = {
+            role: 'assistant',
+            content,
+            toolEvents: [...activeToolEvents.value],
+          };
+          messages.value.push(assistantMsg);
+          await saveMessage(convId, convBookId, assistantMsg);
+        }
         streamingText.value = '';
         activeToolEvents.value = [];
         isStreaming.value = false;
+        abortController = null;
       },
       async (error: string) => {
-        const errorMsg: DisplayMessage = {
-          role: 'assistant',
-          content: `❌ 出错了: ${error}`,
-          toolEvents: [],
-        };
-        messages.value.push(errorMsg);
-        await saveMessage(convId, convBookId, errorMsg);
+        const content = streamingText.value;
+        if (content) {
+          const partialMsg: DisplayMessage = {
+            role: 'assistant',
+            content: content + '\n\n⚠️ 生成中断',
+            toolEvents: [...activeToolEvents.value],
+          };
+          messages.value.push(partialMsg);
+          await saveMessage(convId, convBookId, partialMsg);
+        } else {
+          const errorMsg: DisplayMessage = {
+            role: 'assistant',
+            content: `❌ 出错了: ${error}`,
+            toolEvents: [],
+          };
+          messages.value.push(errorMsg);
+          await saveMessage(convId, convBookId, errorMsg);
+        }
         streamingText.value = '';
         activeToolEvents.value = [];
         isStreaming.value = false;
+        abortController = null;
       },
+      abortController.signal,
     );
   } catch (e: any) {
-    const errorMsg: DisplayMessage = {
-      role: 'assistant',
-      content: `❌ 请求失败: ${e.message}`,
-      toolEvents: [],
-    };
-    messages.value.push(errorMsg);
-    await saveMessage(convId, convBookId, errorMsg);
+    const content = streamingText.value;
+    if (content) {
+      const partialMsg: DisplayMessage = {
+        role: 'assistant',
+        content: content + '\n\n⚠️ 生成中断',
+        toolEvents: [...activeToolEvents.value],
+      };
+      messages.value.push(partialMsg);
+      await saveMessage(convId, convBookId, partialMsg);
+    } else {
+      const errorMsg: DisplayMessage = {
+        role: 'assistant',
+        content: `❌ 请求失败: ${e.message}`,
+        toolEvents: [],
+      };
+      messages.value.push(errorMsg);
+      await saveMessage(convId, convBookId, errorMsg);
+    }
     isStreaming.value = false;
     streamingText.value = '';
     activeToolEvents.value = [];
+    abortController = null;
+  }
+}
+
+function stopGeneration() {
+  if (abortController) {
+    abortController.abort();
   }
 }
 
@@ -248,6 +289,7 @@ export function useAiChat() {
     startNewConversation,
     deleteConversation,
     sendMessage,
+    stopGeneration,
     clearMessages,
   };
 }

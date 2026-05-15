@@ -13,10 +13,10 @@
           </div>
         </div>
         <div class="ai-header-right">
-          <button v-if="currentBookId" class="ai-action-btn" @click="showConversationList = true" title="历史会话">
+          <button class="ai-action-btn" @click="showConversationList = true" title="历史会话">
             <History :size="14" />
           </button>
-          <button v-if="currentBookId" class="ai-action-btn" @click="handleNewConversation" title="新建会话">
+          <button class="ai-action-btn" @click="handleNewConversation" title="新建会话">
             <Plus :size="14" />
           </button>
           <button v-if="messages.length > 0" class="ai-action-btn" @click="handleClear" title="清空对话">
@@ -101,7 +101,18 @@
               </div>
             </div>
             <div v-if="msg.role === 'user'" class="message-text">{{ msg.content }}</div>
-            <div v-else class="message-text markdown-body" v-html="renderMarkdown(msg.content)"></div>
+            <div v-else class="message-text-wrapper">
+              <div class="message-text markdown-body" v-html="renderMarkdown(msg.content)"></div>
+              <button
+                class="copy-btn"
+                :class="{ copied: copiedIdx === idx }"
+                @click="copyMessage(msg.content, idx)"
+                :title="copiedIdx === idx ? '已复制' : '复制'"
+              >
+                <Check v-if="copiedIdx === idx" :size="12" />
+                <Copy v-else :size="12" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -138,9 +149,17 @@
             @input="autoResize"
           ></textarea>
           <button
+            v-if="isStreaming"
+            class="stop-btn"
+            @click="stopGeneration"
+          >
+            <Square :size="14" />
+          </button>
+          <button
+            v-else
             class="send-btn"
-            :class="{ active: inputText.trim() && !isStreaming }"
-            :disabled="!inputText.trim() || isStreaming"
+            :class="{ active: inputText.trim() }"
+            :disabled="!inputText.trim()"
             @click="handleSend"
           >
             <Send :size="16" />
@@ -153,7 +172,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick, watch, onMounted } from 'vue';
-import { Sparkles, X, Send, Trash2, Plus, History, MessageSquare } from 'lucide-vue-next';
+import { Sparkles, X, Send, Trash2, Plus, History, MessageSquare, Square, Copy, Check } from 'lucide-vue-next';
 import { Marked } from 'marked';
 import { useAiChat } from '../composables/useAiChat';
 
@@ -176,6 +195,7 @@ const {
   startNewConversation,
   deleteConversation,
   sendMessage,
+  stopGeneration,
   clearMessages,
 } = useAiChat();
 
@@ -183,6 +203,7 @@ const inputText = ref('');
 const messagesContainer = ref<HTMLElement | null>(null);
 const inputRef = ref<HTMLTextAreaElement | null>(null);
 const showConversationList = ref(false);
+const copiedIdx = ref<number | null>(null);
 
 const MIN_WIDTH = 360;
 const MAX_WIDTH = 720;
@@ -295,10 +316,31 @@ async function handleDeleteConversation(convId: string) {
   await deleteConversation(convId);
 }
 
+async function copyMessage(content: string, idx: number) {
+  try {
+    await navigator.clipboard.writeText(content);
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = content;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+  copiedIdx.value = idx;
+  setTimeout(() => {
+    copiedIdx.value = null;
+  }, 2000);
+}
+
 onMounted(() => {
   const match = window.location.pathname.match(/\/book\/([^/]+)/);
   if (match) {
     switchBook(match[1]);
+  } else {
+    switchBook(null);
   }
 });
 
@@ -766,6 +808,42 @@ defineExpose({ switchBook });
   border-bottom-left-radius: 4px;
 }
 
+.message-text-wrapper {
+  position: relative;
+}
+
+.message-text-wrapper .copy-btn {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.06);
+  color: #9ca3af;
+  opacity: 0;
+  transition: opacity 0.2s, background 0.2s, color 0.2s;
+  cursor: pointer;
+}
+
+.message-text-wrapper:hover .copy-btn {
+  opacity: 1;
+}
+
+.message-text-wrapper .copy-btn:hover {
+  background: rgba(0, 0, 0, 0.12);
+  color: #6b7280;
+}
+
+.message-text-wrapper .copy-btn.copied {
+  opacity: 1;
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
 .markdown-body :deep(h1),
 .markdown-body :deep(h2),
 .markdown-body :deep(h3),
@@ -943,5 +1021,23 @@ defineExpose({ switchBook });
 
 .send-btn.active:hover {
   background: var(--primary-hover);
+}
+
+.stop-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #ef4444;
+  color: #fff;
+  transition: var(--transition);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.stop-btn:hover {
+  background: #dc2626;
 }
 </style>

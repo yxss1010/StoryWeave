@@ -18,12 +18,24 @@ export async function streamChat(
   onToolEvent: (event: ToolEvent) => void,
   onDone: () => void,
   onError: (error: string) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/chat/stream`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages, bookId }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/chat/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages, bookId }),
+      signal,
+    });
+  } catch (e: any) {
+    if (e.name === 'AbortError') {
+      onDone();
+      return;
+    }
+    onError(e.message || '请求失败');
+    return;
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
@@ -40,42 +52,51 @@ export async function streamChat(
   const decoder = new TextDecoder();
   let buffer = '';
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
 
-    for (const line of lines) {
-      if (!line.startsWith('data: ')) continue;
-      const jsonStr = line.slice(6).trim();
-      if (!jsonStr) continue;
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const jsonStr = line.slice(6).trim();
+        if (!jsonStr) continue;
 
-      try {
-        const data = JSON.parse(jsonStr);
-        switch (data.type) {
-          case 'text':
-            onText(data.content);
-            break;
-          case 'tool_start':
-            onToolEvent({ type: 'tool_start', name: data.name, input: data.input });
-            break;
-          case 'tool_end':
-            onToolEvent({ type: 'tool_end', name: data.name });
-            break;
-          case 'done':
-            onDone();
-            break;
-          case 'error':
-            onError(data.content);
-            break;
+        try {
+          const data = JSON.parse(jsonStr);
+          switch (data.type) {
+            case 'text':
+              onText(data.content);
+              break;
+            case 'tool_start':
+              onToolEvent({ type: 'tool_start', name: data.name, input: data.input });
+              break;
+            case 'tool_end':
+              onToolEvent({ type: 'tool_end', name: data.name });
+              break;
+            case 'done':
+              onDone();
+              break;
+            case 'error':
+              onError(data.content);
+              break;
+          }
+        } catch {
+          // skip malformed JSON
         }
-      } catch {
-        // skip malformed JSON
       }
     }
+  } catch (e: any) {
+    if (e.name === 'AbortError') {
+      reader.cancel();
+      onDone();
+      return;
+    }
+    onError(e.message || '流读取失败');
   }
 }
 
