@@ -12,7 +12,7 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.prebuilt import create_react_agent
 from starlette.responses import StreamingResponse
 
-from .config import AGENT_RECURSION_LIMIT, GLM_ANTHROPIC_URL, GLM_MODEL_ID, MCP_SERVER_CONFIG, SYSTEM_PROMPT
+from .config import AGENT_MAX_TOKENS, AGENT_RECURSION_LIMIT, GLM_ANTHROPIC_URL, GLM_MODEL_ID, MCP_SERVER_CONFIG, SYSTEM_PROMPT
 
 
 def create_llm() -> ChatAnthropic:
@@ -21,7 +21,7 @@ def create_llm() -> ChatAnthropic:
         anthropic_api_url=GLM_ANTHROPIC_URL,
         anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY", "not-needed"),
         temperature=0.7,
-        max_tokens=8192,
+        max_tokens=AGENT_MAX_TOKENS,
     )
 
 

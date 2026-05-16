@@ -19,7 +19,7 @@
           <button class="ai-action-btn" @click="handleNewConversation" title="新建会话">
             <Plus :size="14" />
           </button>
-          <button v-if="messages.length > 0" class="ai-action-btn" @click="handleClear" title="清空对话">
+          <button v-if="messages.length > 0" class="ai-action-btn" @click="handleClear" title="删除当前会话">
             <Trash2 :size="14" />
           </button>
           <button class="ai-close" @click="$emit('close')" title="关闭">
@@ -299,7 +299,11 @@ async function handleSend() {
 }
 
 async function handleClear() {
-  await clearMessages(currentConversationId.value || undefined);
+  if (currentConversationId.value) {
+    await deleteConversation(currentConversationId.value);
+  } else {
+    await clearMessages();
+  }
 }
 
 async function handleNewConversation() {

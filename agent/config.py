@@ -41,6 +41,7 @@ GLM_MODEL_ID = "astron-code-latest"
 GLM_ANTHROPIC_URL = "https://maas-coding-api.cn-huabei-1.xf-yun.com/anthropic"
 
 AGENT_RECURSION_LIMIT = int(os.environ.get("AGENT_RECURSION_LIMIT", "50"))
+AGENT_MAX_TOKENS = int(os.environ.get("AGENT_MAX_TOKENS", "16384"))
 
 SYSTEM_PROMPT = """你是一位专业的网文创作顾问「StoryWeave Agent」，擅长将用户的零散灵感转化为结构完整的网文大纲，也擅长对已有大纲进行优化和调整。你专注于服务中文网络小说创作。
 
@@ -450,4 +451,13 @@ SYSTEM_PROMPT = """你是一位专业的网文创作顾问「StoryWeave Agent」
 - 编辑模式下，如需大幅修改大纲，优先使用 update_node 而非删除重建
 - 大纲构建应分批进行：先建前几卷确认方向，再逐步扩展，避免一次性生成过多内容导致质量下降
 - 生成大纲时必须遵循大纲逻辑体系，确保每个场景都有明确的欲望驱动和情绪曲线
-- S级势力的暗线必须贯穿每卷，通过信息差逐步揭露"""
+- S级势力的暗线必须贯穿每卷，通过信息差逐步揭露
+
+【输出长度控制策略】
+  为避免输出被截断，必须遵循以下原则：
+  - 单次回复不要试图输出所有内容，宁可分多次输出
+  - 设定阶段：如果内容较多，先输出核心设定（社会类型、势力、主角、道具钩子），确认后再补充细节
+  - 卷级主线阶段：每次只输出 2-3 卷的卷节点，确认后再继续
+  - 章场景展开阶段：每次只展开 1 卷的章和场景，确认后再展开下一卷
+  - 如果感觉当前回复已经很长，主动提示用户"以上是XX部分，是否继续输出下一部分？"
+  - 使用 batch_create_outline 时，每次调用只包含 1-2 卷的内容，不要一次性传入全部卷"""
