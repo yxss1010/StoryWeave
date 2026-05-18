@@ -185,9 +185,10 @@ import ConfirmModal from './components/ConfirmModal.vue';
 import BookInfoPanel from './components/BookInfoPanel.vue';
 import AiPanel from './components/AiPanel.vue';
 import OutlineTree from './components/OutlineTree.vue';
-import { loadBookData, saveBookData, updateBookMetadata, getBookDetail } from './services/tauri';
+import { loadBookData, saveBookData, updateBookMetadata, getBookDetail, getBookList } from './services/tauri';
 import type { BookMetadata } from './services/tauri';
 import { useAiChat } from './composables/useAiChat';
+import { useNovels } from './composables/useNovels';
 import dagre from 'dagre';
 
 interface BasePlotNodeData {
@@ -240,7 +241,8 @@ const showAiPanel = ref(false);
 const showBookInfo = ref(false);
 const showOutlineTree = ref(false);
 
-const { isStreaming: isAiStreaming } = useAiChat();
+const { isStreaming: isAiStreaming, currentConversationId, hasCreateBookInMessages, getCreateBookTitleFromMessages, migrateConversationToBook } = useAiChat();
+const { loadNovels } = useNovels();
 const aiPanelRef = ref<InstanceType<typeof AiPanel> | null>(null);
 const aiPanelRefBookshelf = ref<InstanceType<typeof AiPanel> | null>(null);
 
@@ -552,34 +554,61 @@ const backToBookshelf = () => {
   selectedEdge.value = null;
   showAiPanel.value = false;
   showBookInfo.value = false;
+  loadNovels();
 };
 
 watch(isAiStreaming, async (streaming, wasStreaming) => {
-  if (wasStreaming && !streaming && currentBook.value && currentView.value === 'editor') {
-    skipAutoSave = true;
-    try {
-      const { nodes: loadedNodes, edges: loadedEdges } = await loadBookData(currentBook.value.file_path);
-      nodes.value = loadedNodes.map(n => ({
-        ...n,
-        data: {
-          ...n.data,
-          description: normalizeText((n.data as Record<string, unknown>).description),
-          change_before: normalizeText((n.data as Record<string, unknown>).change_before),
-          change_after: normalizeText((n.data as Record<string, unknown>).change_after),
-        },
-      }));
-      edges.value = loadedEdges;
-      selectedNode.value = null;
-      const updatedBook = await getBookDetail(currentBook.value.id);
-      currentBook.value = updatedBook;
-      await new Promise(resolve => setTimeout(resolve, 100));
-      await autoLayout();
-    } catch (error) {
-      console.error('Error reloading outline after AI:', error);
-    } finally {
-      nextTick(() => {
-        skipAutoSave = false;
-      });
+  if (wasStreaming && !streaming) {
+    if (currentView.value === 'editor' && currentBook.value) {
+      skipAutoSave = true;
+      try {
+        const { nodes: loadedNodes, edges: loadedEdges } = await loadBookData(currentBook.value.file_path);
+        nodes.value = loadedNodes.map(n => ({
+          ...n,
+          data: {
+            ...n.data,
+            description: normalizeText((n.data as Record<string, unknown>).description),
+            change_before: normalizeText((n.data as Record<string, unknown>).change_before),
+            change_after: normalizeText((n.data as Record<string, unknown>).change_after),
+          },
+        }));
+        edges.value = loadedEdges;
+        selectedNode.value = null;
+        const updatedBook = await getBookDetail(currentBook.value.id);
+        currentBook.value = updatedBook;
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await autoLayout();
+      } catch (error) {
+        console.error('Error reloading outline after AI:', error);
+      } finally {
+        nextTick(() => {
+          skipAutoSave = false;
+        });
+      }
+    } else if (currentView.value === 'bookshelf') {
+      if (hasCreateBookInMessages()) {
+        try {
+          const books = await getBookList();
+          const createBookTitle = getCreateBookTitleFromMessages();
+          let targetBook = createBookTitle
+            ? books.find((b: BookMetadata) => b.title === createBookTitle)
+            : null;
+          if (!targetBook) {
+            targetBook = books.sort(
+              (a: BookMetadata, b: BookMetadata) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            )[0];
+          }
+          if (targetBook) {
+            if (currentConversationId.value) {
+              await migrateConversationToBook(currentConversationId.value, targetBook.id);
+            }
+            await openBook(targetBook);
+            showAiPanel.value = true;
+          }
+        } catch (error) {
+          console.error('Error finding new book after AI creation:', error);
+        }
+      }
     }
   }
 });

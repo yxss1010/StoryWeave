@@ -171,7 +171,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, watch, onMounted } from 'vue';
+import { ref, nextTick, watch } from 'vue';
 import { Sparkles, X, Send, Trash2, Plus, History, MessageSquare, Square, Copy, Check } from 'lucide-vue-next';
 import { Marked } from 'marked';
 import { useAiChat } from '../composables/useAiChat';
@@ -338,15 +338,6 @@ async function copyMessage(content: string, idx: number) {
     copiedIdx.value = null;
   }, 2000);
 }
-
-onMounted(() => {
-  const match = window.location.pathname.match(/\/book\/([^/]+)/);
-  if (match) {
-    switchBook(match[1]);
-  } else {
-    switchBook(null);
-  }
-});
 
 defineExpose({ switchBook });
 </script>

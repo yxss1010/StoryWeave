@@ -203,11 +203,12 @@ async function sendMessage(text: string) {
       },
       async () => {
         const content = streamingText.value;
-        if (content) {
+        const toolEvents = [...activeToolEvents.value];
+        if (content || toolEvents.length > 0) {
           const assistantMsg: DisplayMessage = {
             role: 'assistant',
-            content,
-            toolEvents: [...activeToolEvents.value],
+            content: content || '',
+            toolEvents,
           };
           messages.value.push(assistantMsg);
           await saveMessage(convId, convBookId, assistantMsg);
@@ -219,11 +220,12 @@ async function sendMessage(text: string) {
       },
       async (error: string) => {
         const content = streamingText.value;
-        if (content) {
+        const toolEvents = [...activeToolEvents.value];
+        if (content || toolEvents.length > 0) {
           const partialMsg: DisplayMessage = {
             role: 'assistant',
-            content: content + '\n\n⚠️ 生成中断',
-            toolEvents: [...activeToolEvents.value],
+            content: (content || '') + '\n\n⚠️ 生成中断',
+            toolEvents,
           };
           messages.value.push(partialMsg);
           await saveMessage(convId, convBookId, partialMsg);
@@ -245,11 +247,12 @@ async function sendMessage(text: string) {
     );
   } catch (e: any) {
     const content = streamingText.value;
-    if (content) {
+    const toolEvents = [...activeToolEvents.value];
+    if (content || toolEvents.length > 0) {
       const partialMsg: DisplayMessage = {
         role: 'assistant',
-        content: content + '\n\n⚠️ 生成中断',
-        toolEvents: [...activeToolEvents.value],
+        content: (content || '') + '\n\n⚠️ 生成中断',
+        toolEvents,
       };
       messages.value.push(partialMsg);
       await saveMessage(convId, convBookId, partialMsg);
@@ -275,6 +278,49 @@ function stopGeneration() {
   }
 }
 
+async function migrateConversationToBook(conversationId: string, newBookId: string) {
+  await db.conversations.update(conversationId, { bookId: newBookId, updatedAt: Date.now() });
+  await db.messages.where('conversationId').equals(conversationId).modify({ bookId: newBookId });
+
+  const conv = conversations.value.find(c => c.id === conversationId);
+  if (conv) {
+    conv.bookId = newBookId;
+    conv.updatedAt = Date.now();
+  }
+
+  if (currentConversationId.value === conversationId) {
+    currentBookId.value = newBookId;
+  }
+}
+
+function hasCreateBookInMessages(): boolean {
+  for (let i = messages.value.length - 1; i >= 0; i--) {
+    const msg = messages.value[i];
+    if (msg.role === 'assistant' && msg.toolEvents) {
+      for (const evt of msg.toolEvents) {
+        if (evt.type === 'tool_end' && evt.name === 'create_book') {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+function getCreateBookTitleFromMessages(): string | null {
+  for (let i = messages.value.length - 1; i >= 0; i--) {
+    const msg = messages.value[i];
+    if (msg.role === 'assistant' && msg.toolEvents) {
+      for (const evt of msg.toolEvents) {
+        if (evt.type === 'tool_start' && evt.name === 'create_book' && evt.input?.title) {
+          return evt.input.title as string;
+        }
+      }
+    }
+  }
+  return null;
+}
+
 export function useAiChat() {
   return {
     messages,
@@ -291,5 +337,8 @@ export function useAiChat() {
     sendMessage,
     stopGeneration,
     clearMessages,
+    migrateConversationToBook,
+    hasCreateBookInMessages,
+    getCreateBookTitleFromMessages,
   };
 }
